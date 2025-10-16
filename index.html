@@ -3,345 +3,223 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>UGPS：街頭停留潛勢指標</title>
-
-  <!-- Leaflet -->
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-
-  <!-- Leaflet.heat -->
-  <script src="https://unpkg.com/leaflet.heat/dist/leaflet-heat.js"></script>
-
+  <title>UGPS</title>
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+    crossorigin=""
+  />
   <style>
     :root{
-      --ui-border:#e7e7e7;
-      --ui-muted:#777;
-      --ui-primary:#5b6cff;
-      --badge-bg:#fff;
+      --warm-1:#FFE08A; /* 淡黃 */
+      --warm-2:#FF9F43; /* 橘 */
+      --warm-3:#FF6B6B; /* 紅 */
     }
-    *{box-sizing:border-box}
-    body{
-      margin:24px;
-      font-family: system-ui,-apple-system,"Segoe UI",Roboto,"Noto Sans TC",Arial,sans-serif;
-      color:#222;
-    }
-    /* header */
-    .row{display:flex;gap:12px;align-items:center}
-    .row.space{margin-bottom:16px}
-    h1{font-size:28px;margin:0}
-    .lang-switch{margin-left:auto}
-    .badge{
-      padding:6px 12px;border:1px solid var(--ui-border);
-      border-radius:999px;background:var(--badge-bg);cursor:pointer
-    }
+    body{font-family:system-ui,-apple-system,"Segoe UI",Roboto,"Noto Sans TC",Arial,sans-serif;margin:24px}
+    .row{display:flex;gap:12px;align-items:center;margin-bottom:16px}
+    .badge{padding:6px 10px;border:1px solid #ddd;border-radius:999px;background:#fff;cursor:pointer}
     .badge.active{background:#eef;border-color:#99f}
+    .card{border:1px solid #eee;border-radius:12px;padding:16px}
+    small{color:#777}
 
-    /* nav */
-    nav a{margin-right:16px}
-    nav a:link,nav a:visited{color:#4b4b4b}
-    nav a:hover{text-decoration:underline}
-
-    /* card */
-    .card{border:1px solid var(--ui-border);border-radius:12px;padding:16px}
-    .legend-bar{height:10px;border-radius:999px;background:linear-gradient(90deg,#9cf,#ffd666,#ff8a3d,#e02424)}
-    small{color:var(--ui-muted)}
-    /* map */
-    #map{height:560px;border-radius:12px;border:1px solid var(--ui-border)}
-    .map-toolbar{
-      position:absolute;right:12px;top:12px;display:flex;gap:8px;z-index:500;
-    }
-    .pill{
-      padding:8px 12px;border:1px solid var(--ui-border);background:#fff;border-radius:999px;cursor:pointer
-    }
-    .pill.active{border-color:#99f;background:#eef}
-    .map-wrap{position:relative}
-
-    /* list */
-    .list{margin-top:12px}
-    .item{
-      display:flex;align-items:center;justify-content:space-between;
-      padding:10px 12px;border:1px solid var(--ui-border);border-radius:10px;margin:8px 0
+    /* legend：暖色漸層 */
+    .legend-bar{
+      height:8px;border-radius:999px;width:100%;
+      background:linear-gradient(90deg,var(--warm-1) 0%,var(--warm-2) 55%,var(--warm-3) 100%);
     }
 
-    /* footer meta */
-    .meta{
-      position:fixed;right:16px;bottom:16px;background:#fff;border:1px solid var(--ui-border);
-      border-radius:10px;padding:8px 12px;font-size:12px;color:#555
+    /* 自訂點位：彩色實心 + 黑細圈 + 白細圈（顏色大，邊緣薄） */
+    .ugps-dot{
+      width:20px;height:20px;border-radius:50%;
+      background:var(--fill,#FF9F43);           /* 實心顏色（依分數） */
+      box-shadow:
+        0 0 0 2px #000,                          /* 黑色外圈（薄）   */
+        0 0 0 4px #fff;                          /* 白色外圈（薄）   */
+      transform:translate(-10px,-10px);         /* 以中心定位       */
     }
-    .btn{
-      padding:8px 12px;border:1px solid var(--ui-border);border-radius:8px;background:#fff;cursor:pointer
-    }
-    .btn + .btn{margin-left:8px}
+
+    #map{height:560px;border-radius:12px;overflow:hidden}
   </style>
 </head>
 <body>
-  <!-- header -->
-  <div class="row space">
-    <h1 id="app.title">UGPS：街頭停留潛勢指標</h1>
-    <div class="lang-switch">
+  <div class="row">
+    <h1 id="app.title">UGPS</h1>
+    <div style="margin-left:auto">
       <button id="btn-zhtw" class="badge">zhtw</button>
       <button id="btn-enus" class="badge">enus</button>
     </div>
   </div>
 
-  <!-- nav -->
-  <nav class="row space">
+  <div class="row">
     <a id="nav.home" href="#">首頁</a>
-    <a id="nav.map" href="#">地圖</a>
-    <a id="nav.export" href="#">匯出</a>
-  </nav>
+    <a id="nav.map" href="#" style="margin-left:12px">地圖</a>
+    <a id="nav.export" href="#" style="margin-left:12px">匯出</a>
+  </div>
 
-  <!-- legend -->
-  <div class="card space">
+  <div class="card" aria-label="legend">
     <b id="legend.title">Legend</b>
     <div class="row" style="margin-top:8px">
       <small id="map.legend.low">低</small>
-      <div class="legend-bar" style="flex:1"></div>
+      <div class="legend-bar" title="Low → High"></div>
       <small id="map.legend.high">高</small>
     </div>
   </div>
 
-  <!-- map + toolbar -->
-  <div class="card space map-wrap">
-    <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
-      <b id="map.title">地圖</b>
-      <small id="map.subtitle">UGPS 分數點位</small>
-    </div>
-    <div class="map-toolbar">
-      <button id="btn-points" class="pill active">點位</button>
-      <button id="btn-heat"   class="pill">熱度圖</button>
+  <div class="card" style="margin-top:16px">
+    <div class="row" style="justify-content:space-between;align-items:center;margin-bottom:10px">
+      <div style="font-weight:600"> <span id="map.title">地圖</span> · <small>UGPS 分數點位</small></div>
+      <div>
+        <button id="btn-points" class="badge active">點位</button>
+        <button id="btn-heat"   class="badge">熱度圖</button>
+      </div>
     </div>
     <div id="map"></div>
   </div>
 
-  <!-- Top-3 + export -->
-  <div class="card space">
+  <div class="card" style="margin-top:16px">
     <b id="top3.title">優先格網 Top-3</b>
-    <div id="top3" class="list"></div>
-    <div style="margin-top:8px">
-      <button class="btn" id="btn-export-tasks">匯出外展任務（CSV）</button>
-      <button class="btn" id="btn-export-top3">匯出 Top-3（CSV）</button>
-    </div>
+    <ol id="top3"></ol>
   </div>
 
-  <div class="meta">
+  <div style="position:fixed;right:16px;bottom:16px;background:#fff;border:1px solid #eee;border-radius:10px;padding:8px 12px;font-size:12px;color:#555">
     <b id="meta.dataSource">資料來源</b>：OSM / Gov Open Data　|　
     <b id="meta.version">版本</b>：v0.0.1
   </div>
 
-<script>
-/* =========================
-   1) I18N（zh / en）
-========================= */
-const LANG_KEY="ugps_lang";
-const supported=["zhtw","enus"];
-let lang=localStorage.getItem(LANG_KEY)||"zhtw";
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+    integrity="sha256-o9N1j7kGStb6ZkM00syQFhGZ8ZQ8v4v1jz7G8Q1rC2c=" crossorigin=""></script>
+  <script src="https://unpkg.com/leaflet.heat/dist/leaflet-heat.js"></script>
 
-async function loadLang(l){
-  try{
-    if(!supported.includes(l)) l="zhtw";
-    const res=await fetch(`./locales/${l}.json`,{cache:"no-cache"});
-    const dict=await res.json();
+  <script>
+    /* -------------------- 語系 -------------------- */
+    const LANG_KEY = "ugps_lang";
+    const supported = ["zhtw","enus"];
+    let lang = localStorage.getItem(LANG_KEY) || "zhtw";
 
-    Object.keys(dict).forEach(k=>{
-      const el=document.getElementById(k);
-      if(el) el.textContent = dict[k];
-    });
+    async function loadLang(l){
+      if(!supported.includes(l)) l = "zhtw";
+      const res = await fetch(`./locales/${l}.json`, {cache:"no-cache"});
+      const dict = await res.json();
 
-    // 切換按鈕樣式
-    document.getElementById("btn-zhtw").classList.toggle("active", l==="zhtw");
-    document.getElementById("btn-enus").classList.toggle("active", l==="enus");
-    // <html lang>
-    document.documentElement.setAttribute("lang", l==="zhtw"?"zh-Hant":"en");
-    localStorage.setItem(LANG_KEY,l);
-    lang=l;
-  }catch(e){
-    console.error(e);
-  }
-}
-document.getElementById("btn-zhtw").onclick = ()=>loadLang("zhtw");
-document.getElementById("btn-enus").onclick = ()=>loadLang("enus");
-loadLang(lang);
+      Object.keys(dict).forEach(k=>{
+        const el = document.getElementById(k);
+        if(el) el.textContent = dict[k];
+      });
 
-/* =========================
-   2) 假資料（實戰可換你自己的）
-   台北車站周邊 10 個點，score 0~100
-========================= */
-const scorePoints=[
-  {lat:25.0479,lng:121.5171,score:62},
-  {lat:25.0470,lng:121.5160,score:53},
-  {lat:25.0459,lng:121.5151,score:41},
-  {lat:25.0488,lng:121.5186,score:30},
-  {lat:25.0500,lng:121.5178,score:28},
-  {lat:25.0491,lng:121.5165,score:22},
-  {lat:25.0455,lng:121.5192,score:18},
-  {lat:25.0466,lng:121.5202,score:16},
-  {lat:25.0481,lng:121.5205,score:14},
-  {lat:25.0496,lng:121.5195,score:12}
-];
-
-/* =========================
-   3) Leaflet map
-========================= */
-let map, markersLayer, heatLayer;
-
-function ensureMap(){
-  if(map) return;
-
-  map=L.map("map",{zoomControl:true,scrollWheelZoom:true})
-        .setView([25.0479,121.5171],16);
-
-  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{
-    maxZoom:19,attribution:'&copy; OpenStreetMap contributors'
-  }).addTo(map);
-
-  // 點位圖層（雙圈：外橘+內白）
-  markersLayer=L.layerGroup();
-  scorePoints.forEach(p=>{
-    const r = Math.max(6, Math.min(12, Math.round(p.score/8))); // 點大小跟 score 微調
-    const outer = L.circleMarker([p.lat,p.lng],{
-      radius:r, color:"#fff", weight:3,
-      fill:true, fillColor:"#ff9a3c", fillOpacity:0.9
-    });
-    const inner = L.circleMarker([p.lat,p.lng],{
-      radius:Math.max(2,r-5), color:"#fff", weight:2, fill:true,
-      fillColor:"#fff", fillOpacity:0.9
-    });
-    outer.bindTooltip(`score: ${p.score}`,{direction:"top",offset:[0,-6]});
-    markersLayer.addLayer(outer).addLayer(inner);
-  });
-  markersLayer.addTo(map);
-
-  // 熱度圖
-  heatLayer = L.heatLayer(
-    scorePoints.map(p=>[p.lat,p.lng, Math.max(0.05, Math.min(1, p.score/80))]),
-    heatOptionsForZoom(map.getZoom())
-  );
-
-  // 縮放時「安全」重建熱度圖（避免 removeChild 例外）
-  map.on("zoomend",()=>{
-    const data=(heatLayer && Array.isArray(heatLayer._latlngs))?heatLayer._latlngs:[];
-    if(heatLayer && heatLayer._canvas && map.hasLayer(heatLayer)){
-      map.removeLayer(heatLayer);
+      document.title = dict["app.title"] || "UGPS";
+      document.documentElement.setAttribute("lang", l==="zhtw" ? "zh-Hant" : "en");
+      document.getElementById("btn-zhtw").classList.toggle("active", l==="zhtw");
+      document.getElementById("btn-enus").classList.toggle("active", l==="enus");
+      localStorage.setItem(LANG_KEY, l);
+      lang = l;
     }
-    heatLayer = L.heatLayer(data, heatOptionsForZoom(map.getZoom()));
-    // 只有在熱度模式才加回
-    if(document.getElementById("btn-heat").classList.contains("active")){
-      heatLayer.addTo(map);
+    document.getElementById("btn-zhtw").onclick = ()=> loadLang("zhtw");
+    document.getElementById("btn-enus").onclick = ()=> loadLang("enus");
+    loadLang(lang);
+
+    /* -------------------- 假資料（示意） -------------------- */
+    const points = [
+      {lat:25.0495, lng:121.5165, score:.85},
+      {lat:25.0476, lng:121.5170, score:.65},
+      {lat:25.0486, lng:121.5151, score:.55},
+      {lat:25.0489, lng:121.5178, score:.75},
+      {lat:25.0459, lng:121.5136, score:.40}
+    ];
+
+    /* -------------------- 著色邏輯 -------------------- */
+    function scoreColor(t){
+      const s = Math.max(0, Math.min(1, t));
+      if (s < 0.5){
+        const k = s/0.5;
+        return lerpColor("#FFE08A","#FF9F43",k);
+      }else{
+        const k = (s-0.5)/0.5;
+        return lerpColor("#FF9F43","#FF6B6B",k);
+      }
     }
-  });
-}
-ensureMap();
+    function hexToRgb(h){const m=/^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(h);return m?{r:parseInt(m[1],16),g:parseInt(m[2],16),b:parseInt(m[3],16)}:null}
+    function rgbToHex({r,g,b}){const to=v=>v.toString(16).padStart(2,"0");return `#${to(r)}${to(g)}${to(b)}`}
+    function lerp(a,b,t){return a+(b-a)*t}
+    function lerpColor(a,b,t){
+      const ca=hexToRgb(a), cb=hexToRgb(b);
+      return rgbToHex({r:Math.round(lerp(ca.r,cb.r,t)),g:Math.round(lerp(ca.g,cb.g,t)),b:Math.round(lerp(ca.b,cb.b,t))});
+    }
 
-/* 放大熱度半徑：zoom 越近越大、顏色更明顯 */
-function heatOptionsForZoom(z){
-  const radius = (z<=13) ? 28 : (z<=15) ? 42 : (z<=17) ? 62 : 82;
-  const blur   = Math.round(radius*0.7);
-  return {
-    radius, blur, maxZoom:19,
-    gradient:{
-      0.00:"rgba(0,0,0,0)",
-      0.35:"#78c8ff",
-      0.55:"#ffd666",
-      0.75:"#ff8a3d",
-      1.00:"#e02424"
-    },
-    minOpacity:0.35, maxOpacity:0.95
-  };
-}
+    /* -------------------- Leaflet Map -------------------- */
+    const map = L.map('map', {zoomControl:true}).setView([25.0479,121.5171], 16);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19, attribution: '&copy; OpenStreetMap contributors'
+    }).addTo(map);
 
-/* 模式切換（點位 / 熱度圖）*/
-function showPoints(){
-  document.getElementById("btn-points").classList.add("active");
-  document.getElementById("btn-heat").classList.remove("active");
+    /* 點位層：使用 divIcon 套用自訂樣式 */
+    const pointsLayer = L.layerGroup();
+    function drawPoints(){
+      pointsLayer.clearLayers();
+      points.forEach(p=>{
+        const color = scoreColor(p.score);
+        const icon = L.divIcon({
+          className:'',
+          html:`<span class="ugps-dot" style="--fill:${color}"></span>`,
+          iconSize:[20,20], iconAnchor:[10,10]
+        });
+        L.marker([p.lat,p.lng], {icon}).addTo(pointsLayer);
+      });
+    }
+    drawPoints();
+    pointsLayer.addTo(map);
 
-  if(markersLayer && !map.hasLayer(markersLayer)) markersLayer.addTo(map);
-  // 確保熱度圖完全移除
-  if(heatLayer && map.hasLayer(heatLayer)){
-    if(heatLayer._canvas) map.removeLayer(heatLayer);
-  }
-}
-function showHeat(){
-  document.getElementById("btn-heat").classList.add("active");
-  document.getElementById("btn-points").classList.remove("active");
+    /* 熱度圖（暖色，不藍） */
+    let heatLayer = null;
+    const HEAT_GRADIENT = { 0:'#FFE08A', 0.5:'#FF9F43', 1:'#FF6B6B' };
+    function addHeat(){
+      if(heatLayer) map.removeLayer(heatLayer);
+      const heatData = points.map(p=>[p.lat, p.lng, p.score]);
+      heatLayer = L.heatLayer(heatData, {
+        radius: 42, blur: 28, maxZoom: 19, gradient: HEAT_GRADIENT
+      }).addTo(map);
+    }
 
-  if(heatLayer && !map.hasLayer(heatLayer)) heatLayer.addTo(map);
-  if(markersLayer && map.hasLayer(markersLayer)) map.removeLayer(markersLayer);
-}
-document.getElementById("btn-points").onclick = showPoints;
-document.getElementById("btn-heat").onclick   = showHeat;
+    /* 模式切換 */
+    const btnPoints = document.getElementById('btn-points');
+    const btnHeat   = document.getElementById('btn-heat');
 
-/* =========================
-   4) Top-3（把點聚成小格網）
-========================= */
-function buildTop3(){
-  // 以 ~200m 為粒度（台北緯度，一個 0.002 度約 220m）
-  const STEP = 0.002;
-  const bins = new Map();
-  scorePoints.forEach(p=>{
-    const ky = `${(Math.round(p.lat/STEP)*STEP).toFixed(4)},${(Math.round(p.lng/STEP)*STEP).toFixed(4)}`;
-    bins.set(ky, (bins.get(ky)||0)+p.score);
-  });
-  const sorted=[...bins.entries()]
-        .map(([k,v],i)=>({key:k,score:v,i}))
-        .sort((a,b)=>b.score-a.score)
-        .slice(0,3);
+    function showPoints(){
+      btnPoints.classList.add('active');
+      btnHeat.classList.remove('active');
+      if(heatLayer){ map.removeLayer(heatLayer); heatLayer=null; }
+      if(!map.hasLayer(pointsLayer)) pointsLayer.addTo(map);
+    }
+    function showHeat(){
+      btnHeat.classList.add('active');
+      btnPoints.classList.remove('active');
+      if(map.hasLayer(pointsLayer)) map.removeLayer(pointsLayer);
+      addHeat();
+    }
+    btnPoints.addEventListener('click', showPoints);
+    btnHeat.addEventListener('click', showHeat);
 
-  const wrap=document.getElementById("top3");
-  wrap.innerHTML="";
-  sorted.forEach((cell,idx)=>{
-    const [la,ln]=cell.key.split(",");
-    const el=document.createElement("div");
-    el.className="item";
-    el.innerHTML=`<div>${idx+1}. C${(idx+1).toString().padStart(2,"0")} (${Number(la).toFixed(4)}, ${Number(ln).toFixed(4)})</div>
-                  <b>${Math.round(cell.score)}</b>`;
-    wrap.appendChild(el);
-  });
-}
-buildTop3();
+    map.on('zoomend', ()=>{
+      if(heatLayer){
+        const data = heatLayer._latlngs;
+        map.removeLayer(heatLayer);
+        heatLayer = L.heatLayer(data, {
+          radius: 42, blur: 28, maxZoom: 19, gradient: HEAT_GRADIENT
+        }).addTo(map);
+      }
+    });
 
-/* =========================
-   5) CSV 匯出（含 UTF-8 BOM 防亂碼）
-========================= */
-function saveCSV(filename, rows){
-  const bom = "\ufeff"; // UTF-8 BOM
-  const content = bom + rows.map(r=>r.map(x=>{
-    const s=String(x??"");
-    return /[",\n]/.test(s) ? `"${s.replace(/"/g,'""')}"` : s;
-  }).join(",")).join("\n");
-
-  const blob = new Blob([content],{type:"text/csv;charset=utf-8;"});
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href=url; a.download=filename; document.body.appendChild(a); a.click();
-  setTimeout(()=>{ URL.revokeObjectURL(url); a.remove(); },0);
-}
-
-// 外展任務：用所有點位輸出（示範）
-document.getElementById("btn-export-tasks").onclick=()=>{
-  const rows=[["name","lat","lng","score","note"]];
-  scorePoints.forEach((p,i)=>rows.push([
-    `UGPS-${String(i+1).padStart(3,"0")}`, p.lat, p.lng, p.score, "outreach"
-  ]));
-  saveCSV("ugps_outreach_tasks.csv", rows);
-};
-
-// Top-3 匯出：聚合後的 3 格
-document.getElementById("btn-export-top3").onclick=()=>{
-  const STEP = 0.002;
-  const bins = new Map();
-  scorePoints.forEach(p=>{
-    const ky=`${(Math.round(p.lat/STEP)*STEP).toFixed(4)},${(Math.round(p.lng/STEP)*STEP).toFixed(4)}`;
-    bins.set(ky,(bins.get(ky)||0)+p.score);
-  });
-  const top3=[...bins.entries()].map(([k,v])=>({k,v})).sort((a,b)=>b.v-a.v).slice(0,3);
-  const rows=[["cell","lat","lng","score"]];
-  top3.forEach((c,i)=>{
-    const [la,ln]=c.k.split(",");
-    rows.push([`C${String(i+1).padStart(2,"0")}`, la, ln, Math.round(c.v)]);
-  });
-  saveCSV("ugps_top3.csv", rows);
-};
-</script>
+    /* Top-3（示例） */
+    const top3El = document.getElementById('top3');
+    function renderTop3(){
+      top3El.innerHTML='';
+      points.slice(0,3).forEach((p,i)=>{
+        const li = document.createElement('li');
+        li.textContent = `${i+1}. C${i+19} (${p.lat.toFixed(4)}, ${p.lng.toFixed(4)})`;
+        top3El.appendChild(li);
+      });
+    }
+    renderTop3();
+  </script>
 </body>
 </html>
