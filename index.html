@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>UGPS</title>
+    <style>
+      body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans TC", Arial, sans-serif; margin: 24px; }
+      .row { display:flex; gap:12px; align-items:center; margin-bottom:16px; }
+      .badge { padding:6px 10px; border:1px solid #ddd; border-radius:999px; background:#fff; cursor:pointer; }
+      .badge.active { background:#eef; border-color:#99f; }
+      .card { border:1px solid #eee; border-radius:12px; padding:16px; }
+      small{color:#777}
+    </style>
+  </head>
+  <body>
+    <div class="row">
+      <h1 id="app.title">UGPS</h1>
+      <div style="margin-left:auto">
+        <button id="btn-zhtw" class="badge">zhtw</button>
+        <button id="btn-enus" class="badge">enus</button>
+      </div>
+    </div>
+
+    <div class="row">
+      <a id="nav.home" href="#">首頁</a>
+      <a id="nav.map" href="#" style="margin-left:12px">地圖</a>
+      <a id="nav.export" href="#" style="margin-left:12px">匯出</a>
+    </div>
+
+    <div class="card">
+      <b>Legend</b>
+      <div class="row" style="margin-top:8px">
+        <small id="map.legend.low">低</small>
+        <div style="flex:1;height:8px;background:linear-gradient(90deg,#9cf,#fd6,#f66);border-radius:999px"></div>
+        <small id="map.legend.high">高</small>
+      </div>
+    </div>
+
+    <script>
+      const LANG_KEY = "ugps_lang";
+      const supported = ["zhtw","enus"];
+      let lang = localStorage.getItem(LANG_KEY) || "zhtw";
+
+      async function loadLang(l){
+        if(!supported.includes(l)) l = "zhtw";
+        // 讀對應 JSON
+        const res = await fetch(`./locales/${l}.json`);
+        const dict = await res.json();
+
+        // 用 key 把畫面文字替換
+        Object.keys(dict).forEach(k=>{
+          const el = document.getElementById(k);
+          if(el) el.textContent = dict[k];
+        });
+
+        // 切換按鈕樣式
+        document.getElementById("btn-zhtw").classList.toggle("active", l==="zhtw");
+        document.getElementById("btn-enus").classList.toggle("active", l==="enus");
+
+        // 存記憶
+        localStorage.setItem(LANG_KEY, l);
+        lang = l;
+      }
+
+      document.getElementById("btn-zhtw").onclick = ()=> loadLang("zhtw");
+      document.getElementById("btn-enus").onclick = ()=> loadLang("enus");
+
+      // 預設載入
+      loadLang(lang);
+    </script>
+  </body>
+</html>
