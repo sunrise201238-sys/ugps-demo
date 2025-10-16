@@ -1,1 +1,10 @@
-{}
+{
+  "app.title": "UGPS: Unsheltered Gathering Potential Score",
+  "nav.home": "Home",
+  "nav.map": "Map",
+  "nav.export": "Export",
+  "lang.zhtw": "Chinese (zhtw)",
+  "lang.enus": "English (enus)",
+  "map.legend.low": "Low",
+  "map.legend.high": "High"
+}
