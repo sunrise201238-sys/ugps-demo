@@ -1,1 +1,10 @@
-{}
+{
+  "app.title": "UGPS：街頭停留潛勢指標",
+  "nav.home": "首頁",
+  "nav.map": "地圖",
+  "nav.export": "匯出",
+  "lang.zhtw": "繁中",
+  "lang.enus": "英文",
+  "map.legend.low": "低",
+  "map.legend.high": "高"
+}
