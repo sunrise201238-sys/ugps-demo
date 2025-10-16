@@ -37,6 +37,14 @@
       </div>
     </div>
 
+    <div class="card" id="top.card" style="margin-top:16px">
+  <b id="top.title">Top-3</b>
+  <div id="top.list" style="margin-top:8px">
+    <small>Loading…</small>
+  </div>
+</div>
+
+    
     <script>
       const LANG_KEY = "ugps_lang";
       const supported = ["zhtw","enus"];
@@ -79,7 +87,33 @@
       document.getElementById("btn-enus").onclick = () => loadLang("enus");
 
       // 首次載入（避免快取）
+      async function loadUGPS(){
+  try {
+    const res = await fetch("./data/ugps.json", { cache: "no-cache" });
+    if(!res.ok) throw new Error("fetch ugps.json failed");
+    const data = await res.json();
+
+    // 取前 3 名（若已排序就直接用；否則先依 score 排序）
+    const top = [...(data.grid || [])].sort((a,b)=> b.score - a.score).slice(0,3);
+
+    // 簡單渲染成清單
+    const toRow = (c,i)=>
+      `<div style="display:flex;justify-content:space-between;padding:6px 8px;border:1px solid #eee;border-radius:8px;margin-top:6px">
+         <span>${i+1}. ${c.id} (${c.lat.toFixed(4)}, ${c.lon.toFixed(4)})</span>
+         <b>${(c.score*100).toFixed(0)}</b>
+       </div>`;
+
+    document.getElementById("top.list").innerHTML =
+      top.length ? top.map(toRow).join("") : "<small>no data</small>";
+  } catch(e){
+    document.getElementById("top.list").innerHTML =
+      `<small style="color:#b00">讀取資料失敗：${e.message}</small>`;
+    console.error(e);
+  }
+}
+
       loadLang(lang);
+      loadUGPS();
     </script>
 
     <div style="position:fixed;right:16px;bottom:16px;background:#fff;border:1px solid #eee;border-radius:10px;padding:8px 12px;font-size:12px;color:#555">
