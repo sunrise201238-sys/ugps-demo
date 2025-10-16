@@ -17,7 +17,7 @@
       integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
       crossorigin=""
     ></script>
-    <!-- Leaflet Heatmap -->
+    <!-- Leaflet Heatmap 插件 -->
     <script src="https://unpkg.com/leaflet.heat/dist/leaflet-heat.js"></script>
 
     <style>
@@ -115,21 +115,17 @@
       document.getElementById("btn-zhtw").onclick = () => loadLang("zhtw");
       document.getElementById("btn-enus").onclick = () => loadLang("enus");
 
-      /* ------- 熱度參數：擴大半徑 + 平滑，避免近距離條紋/過密 ------- */
-      function heatOptionsForZoom(z){
-        // 更大的半徑（依縮放調整），並增加 blur 平滑
-        const radius = Math.max(34, Math.min(110, Math.round(28 + (z - 11) * 10)));
-        const blur   = Math.round(radius * 0.8);
-        const minOpacity = 0.38;   // 稍低底透明度，避免過度疊加
+      /* ------- 熱度配置（固定放大半徑） ------- */
+      function heatOptionsStatic(){
         return {
-          radius,
-          blur,
+          radius: 60,               // 擴大半徑（比原版更醒目）
+          blur: 36,
           maxZoom: 19,
-          minOpacity,
-          // 溫度色帶（與圖例一致）
+          minOpacity: 0.55,
           gradient: {
             0.00: "#60a5fa",
-            0.45: "#f59e0b",
+            0.35: "#93c5fd",
+            0.55: "#f59e0b",
             0.75: "#f97316",
             1.00: "#ef4444"
           }
@@ -140,9 +136,9 @@
       let map, markersLayer, heatLayer;
       window.__ugpsTop3 = [];
       window.__ugpsContext = {};
-      let __points = [];
 
       function colorByScore01(x){
+        // 與圖例一致：藍→黃→紅（以 HSL 漸變）
         const clrs = [[220,91,60],[38,90,55],[0,85,58]];
         const p = Math.max(0, Math.min(1, x));
         const t = p < 0.5 ? p*2 : (p-0.5)*2;
@@ -162,24 +158,12 @@
           attribution: '&copy; OpenStreetMap contributors'
         }).addTo(map);
 
+        // 讓點位顯示在熱度圖上方
         map.createPane("points");
         map.getPane("points").style.zIndex = 650;
 
         markersLayer = L.layerGroup().addTo(map);
-        heatLayer = L.heatLayer([], heatOptionsForZoom(map.getZoom())).addTo(map);
-
-        // zoom 時重建 heat (避免殘影、條紋；重用舊資料)
-        map.on("zoomend", () => {
-          const data = heatLayer && Array.isArray(heatLayer._latlngs) ? [...heatLayer._latlngs] : [];
-          if (heatLayer && map.hasLayer(heatLayer)) map.removeLayer(heatLayer);
-          heatLayer = L.heatLayer([], heatOptionsForZoom(map.getZoom())).addTo(map);
-          if (data.length) heatLayer.setLatLngs(data);
-
-          // Points 模式下保持隱藏熱度圖
-          if (document.getElementById("btn-points").classList.contains("active") && map.hasLayer(heatLayer)) {
-            map.removeLayer(heatLayer);
-          }
-        });
+        heatLayer = L.heatLayer([], heatOptionsStatic()).addTo(map);
 
         map.setView([25.0478, 121.5170], 13);
       }
@@ -189,9 +173,10 @@
         document.getElementById("btn-heat").classList.remove("active");
 
         if (markersLayer && !map.hasLayer(markersLayer)) markersLayer.addTo(map);
-        // **確保點位模式下移除熱度圖（避免任何疊加）**
+        // 僅在熱度圖真的掛上去時才移除，避免 DOM 錯誤
         if (heatLayer && map.hasLayer(heatLayer)) map.removeLayer(heatLayer);
       }
+
       function showHeat(){
         document.getElementById("btn-heat").classList.add("active");
         document.getElementById("btn-points").classList.remove("active");
@@ -199,6 +184,7 @@
         if (heatLayer && !map.hasLayer(heatLayer)) heatLayer.addTo(map);
         if (markersLayer && map.hasLayer(markersLayer)) map.removeLayer(markersLayer);
       }
+
       document.getElementById("btn-points").onclick = showPoints;
       document.getElementById("btn-heat").onclick = showHeat;
 
@@ -212,7 +198,6 @@
           window.__ugpsContext = data.context || {};
 
           const pts = Array.isArray(data.grid) ? data.grid : [];
-          __points = pts;
 
           // Top-3
           const top = [...pts].sort((a,b)=>b.score-a.score).slice(0,3);
@@ -227,7 +212,7 @@
           document.getElementById("top.list").innerHTML =
             top.length ? top.map(toRow).join("") : `<small id="map.nodata">No data</small>`;
 
-          // ===== 點位（白暈 + 黑細邊 + 彩色核心） =====
+          // ===== 點位（雙層圈） =====
           markersLayer.clearLayers();
           const bounds = [];
           const coreR = 8, haloR = coreR + 3;
@@ -237,6 +222,7 @@
             bounds.push(ll);
             const fill = colorByScore01(p.score);
 
+            // 白色外圈（光暈）
             L.circleMarker(ll, {
               pane: "points",
               radius: haloR,
@@ -246,6 +232,7 @@
               opacity: 0.9
             }).addTo(markersLayer);
 
+            // 彩色核心 + 深色描邊
             L.circleMarker(ll, {
               pane: "points",
               radius: coreR,
@@ -260,25 +247,24 @@
             .addTo(markersLayer);
           });
 
-          // ===== 熱度圖資料（分位數標準化 + 溫和基底 + 平滑） =====
+          // ===== 熱度圖資料（分位數標準化 + gamma + 基底） =====
           const sorted = pts.map(p => p.score).sort((a,b)=>a-b);
           const q = t => sorted.length ? sorted[Math.floor((sorted.length-1)*t)] : 0;
           const p10 = q(0.10), p90 = q(0.90);
           const rng = Math.max(1e-6, p90 - p10);
 
           const heatData = pts.map(p => {
-            let s = (p.score - p10) / rng;            // 0..1
+            let s = (p.score - p10) / rng;   // 映射到 0~1
             s = Math.max(0, Math.min(1, s));
-            const gamma = 0.7;                        // 平滑對比，避免條紋
+            const gamma = 0.5;               // 對比更高
             let w = Math.pow(s, gamma);
-            w = 0.06 + 0.92 * w;                      // 更低基底，避免大面積過密
-            w = Math.min(0.9, w);                     // 抑制過度飽和
+            w = 0.18 + 0.82 * w;             // 基底值，弱點也顯示
             return [p.lat, p.lon, w];
           });
           heatLayer.setLatLngs(heatData);
 
           if(bounds.length) map.fitBounds(bounds, { padding:[20,20] });
-          showPoints(); // 預設顯示點位（熱度圖在點位模式下完全移除）
+          showPoints(); // 預設顯示點位（熱度圖在點位模式下移除）
         }catch(e){
           document.getElementById("top.list").innerHTML =
             `<small style="color:#b00">讀取資料失敗：${e.message}</small>`;
