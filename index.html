@@ -29,7 +29,7 @@
     </div>
 
     <div class="card">
-      <b>Legend</b>
+      <b id="legend.title">Legend</b>
       <div class="row" style="margin-top:8px">
         <small id="map.legend.low">低</small>
         <div style="flex:1;height:8px;background:linear-gradient(90deg,#9cf,#fd6,#f66);border-radius:999px"></div>
@@ -43,29 +43,42 @@
       let lang = localStorage.getItem(LANG_KEY) || "zhtw";
 
       async function loadLang(l){
-        if (!supported.includes(l)) l = "zhtw";
-        const res = await fetch(`./locales/${l}.json`);
-        const dict = await res.json();
+        try {
+          if (!supported.includes(l)) l = "zhtw";
 
-        // 用 key 把畫面文字替換
-        Object.keys(dict).forEach(k => {
-          const el = document.getElementById(k);
-          if (el) el.textContent = dict[k];
-        });
+          // 讀取語言檔
+          const res = await fetch(`./locales/${l}.json`, { cache: "no-cache" });
+          if (!res.ok) throw new Error(`fetch ${l}.json failed: ${res.status}`);
+          const dict = await res.json();
 
-        // 切換按鈕樣式
-        document.getElementById("btn-zhtw").classList.toggle("active", l === "zhtw");
-        document.getElementById("btn-enus").classList.toggle("active", l === "enus");
+          // 依 key 替換畫面文字
+          Object.keys(dict).forEach(k => {
+            const el = document.getElementById(k);
+            if (el) el.textContent = dict[k];
+          });
 
-        // 存記憶
-        localStorage.setItem(LANG_KEY, l);
-        lang = l;
+          // 頁籤標題與 <html lang>
+          document.title = dict["app.title"] || "UGPS";
+          document.documentElement.setAttribute("lang", l === "zhtw" ? "zh-Hant" : "en");
+
+          // 切換按鈕樣式
+          document.getElementById("btn-zhtw").classList.toggle("active", l === "zhtw");
+          document.getElementById("btn-enus").classList.toggle("active", l === "enus");
+
+          // 記錄選擇
+          localStorage.setItem(LANG_KEY, l);
+          lang = l;
+        } catch (e) {
+          alert("載入語言檔失敗，請重整或稍後再試。\n" + e.message);
+          console.error(e);
+        }
       }
 
+      // 綁定按鈕
       document.getElementById("btn-zhtw").onclick = () => loadLang("zhtw");
       document.getElementById("btn-enus").onclick = () => loadLang("enus");
 
-      // 預設載入
+      // 首次載入（避免快取）
       loadLang(lang);
     </script>
 
