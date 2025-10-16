@@ -128,11 +128,14 @@ window.__ugpsTop3 = [];
   const lines = [header.join(",")].concat(rows.map((c,i)=>
     [i+1, c.id, c.lat, c.lon, Math.round(c.score*100)].join(",")
   ));
-  return lines.join("\n");
+  // 用 CRLF（\r\n）讓 Windows/Excel 較穩定
+  return lines.join("\r\n");
 }
 
 function downloadCSV(filename, text){
-  const blob = new Blob([text], {type: "text/csv;charset=utf-8;"});
+  // 在最前面加 UTF-8 BOM，避免 Excel 亂碼
+  const BOM = "\uFEFF";
+  const blob = new Blob([BOM + text], { type: "text/csv;charset=utf-8;" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
@@ -142,6 +145,7 @@ function downloadCSV(filename, text){
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
 }
+
 
 // 綁定匯出按鈕（用最新的 Top-3）
 document.getElementById("top.export").onclick = ()=>{
