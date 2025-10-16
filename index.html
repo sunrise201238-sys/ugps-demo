@@ -148,13 +148,22 @@
 
         markersLayer = L.layerGroup().addTo(map);
         heatLayer = L.heatLayer([], {
-          radius: 22,
-          blur: 26,
-          maxZoom: 17,
-          minOpacity: 0.28,
-          // 與圖例相同的漸層
-          gradient: { 0.0: "#60a5fa", 0.5: "#f59e0b", 1.0: "#ef4444" }
-        }).addTo(map);
+  // 半徑加大、模糊降低 → 團塊更聚焦更明顯
+  radius: 34,        // 原本 22 → 34
+  blur: 18,          // 原本 26 → 18
+  maxZoom: 19,
+  // 不透明度提高，避免太淡看不見
+  minOpacity: 0.45,  // 原本 0.28 → 0.45
+  // 顏色更飽和，也與圖例一致（藍→黃→橘→紅）
+  gradient: {
+    0.00: "#60a5fa", // 藍
+    0.35: "#93c5fd",
+    0.55: "#f59e0b", // 黃
+    0.75: "#f97316", // 橘
+    1.00: "#ef4444"  // 紅
+  }
+}).addTo(map);
+
 
         map.setView([25.0478, 121.5170], 13);
       }
@@ -234,12 +243,30 @@
           });
 
           // ===== 熱度圖資料（顏色與圖例一致，權重用分數） =====
-          const heatData = pts.map(p => {
-            const s = Math.max(0.01, Math.min(1, p.score));
-            const gamma = 0.8; // 0.7~1.0 可調
-            const w = Math.pow(s, gamma);
-            return [p.lat, p.lon, w];
-          });
+          // 先算分位數，把分數拉開（避免全擠在中間）
+const sorted = pts.map(p => p.score).sort((a,b)=>a-b);
+const q = p => sorted.length ? sorted[Math.floor((sorted.length-1)*p)] : 0;
+// 10% 與 90% 分位數：過低/過高視為離群，壓掉影響
+const p10 = q(0.10), p90 = q(0.90);
+const rng = Math.max(1e-6, p90 - p10);
+
+const heatData = pts.map(p => {
+  // 映射到 0~1
+  let s = (p.score - p10) / rng;
+  s = Math.max(0, Math.min(1, s));
+
+  // 提升權重：γ 小於 1 會放大對比（0.5~0.7 之間可調）
+  const gamma = 0.5;
+  let w = Math.pow(s, gamma);
+
+  // 給一個基底，確保弱點也能看到（0.12~0.2 之間可調）
+  w = 0.18 + 0.82 * w;
+
+  return [p.lat, p.lon, w];
+});
+
+heatLayer.setLatLngs(heatData);
+
           heatLayer.setLatLngs(heatData);
 
           if(bounds.length) map.fitBounds(bounds, { padding:[20,20] });
