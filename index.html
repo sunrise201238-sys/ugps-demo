@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title>UGPS</title>
 
-    <!-- Leaflet（地圖，免金鑰） -->
+    <!-- Leaflet -->
     <link
       rel="stylesheet"
       href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
@@ -87,7 +87,7 @@
       const supported = ["zhtw","enus"];
       let lang = localStorage.getItem(LANG_KEY) || "zhtw";
 
-      // ===== 語言載入 =====
+      /* ----------------- 語言 ----------------- */
       async function loadLang(l){
         try{
           if(!supported.includes(l)) l = "zhtw";
@@ -115,14 +115,35 @@
       document.getElementById("btn-zhtw").onclick = () => loadLang("zhtw");
       document.getElementById("btn-enus").onclick = () => loadLang("enus");
 
-      // ===== ugps.json + 地圖 =====
+      /* ------- 地圖/熱度參數：依縮放自動調整 ------- */
+      function heatOptionsForZoom(z){
+        // 半徑隨 zoom 放大；限制在 20~72 之間
+        const radius = Math.max(20, Math.min(72, Math.round(22 + (z - 11) * 6)));
+        const blur   = Math.round(radius * 0.55);     // 跟著半徑走
+        const minOpacity = Math.max(0.45, Math.min(0.75, 0.45 + (z - 12) * 0.05)); // 放大越不透明
+        return {
+          radius,
+          blur,
+          maxZoom: 19,
+          minOpacity,
+          gradient: {
+            0.00: "#60a5fa",
+            0.35: "#93c5fd",
+            0.55: "#f59e0b",
+            0.75: "#f97316",
+            1.00: "#ef4444"
+          }
+        };
+      }
+
+      /* -------------- 地圖與圖層 -------------- */
       let map, markersLayer, heatLayer;
       window.__ugpsTop3 = [];
       window.__ugpsContext = {};
       let __points = [];
 
       function colorByScore01(x){
-        // 與圖例一致：藍→黃→紅
+        // 與圖例一致：藍→黃→紅（以 HSL 漸變）
         const clrs = [[220,91,60],[38,90,55],[0,85,58]];
         const p = Math.max(0, Math.min(1, x));
         const t = p < 0.5 ? p*2 : (p-0.5)*2;
@@ -142,28 +163,21 @@
           attribution: '&copy; OpenStreetMap contributors'
         }).addTo(map);
 
-        // 讓點位顯示在熱度圖之上
+        // 讓點位顯示在熱度圖上方
         map.createPane("points");
         map.getPane("points").style.zIndex = 650;
 
         markersLayer = L.layerGroup().addTo(map);
-        heatLayer = L.heatLayer([], {
-  // 半徑加大、模糊降低 → 團塊更聚焦更明顯
-  radius: 34,        // 原本 22 → 34
-  blur: 18,          // 原本 26 → 18
-  maxZoom: 19,
-  // 不透明度提高，避免太淡看不見
-  minOpacity: 0.45,  // 原本 0.28 → 0.45
-  // 顏色更飽和，也與圖例一致（藍→黃→橘→紅）
-  gradient: {
-    0.00: "#60a5fa", // 藍
-    0.35: "#93c5fd",
-    0.55: "#f59e0b", // 黃
-    0.75: "#f97316", // 橘
-    1.00: "#ef4444"  // 紅
-  }
-}).addTo(map);
 
+        // 依目前 zoom 建立一次 heatLayer
+        heatLayer = L.heatLayer([], heatOptionsForZoom(map.getZoom())).addTo(map);
+
+        // 縮放時依 zoom 重新建立 heatLayer（沿用舊資料）
+        map.on("zoomend", () => {
+          const data = heatLayer._latlngs || [];
+          if (map.hasLayer(heatLayer)) map.removeLayer(heatLayer);
+          heatLayer = L.heatLayer(data, heatOptionsForZoom(map.getZoom())).addTo(map);
+        });
 
         map.setView([25.0478, 121.5170], 13);
       }
@@ -183,6 +197,7 @@
       document.getElementById("btn-points").onclick = showPoints;
       document.getElementById("btn-heat").onclick = showHeat;
 
+      /* -------------- 載入資料 + 繪製 -------------- */
       async function loadUGPS(){
         try{
           ensureMap();
@@ -242,31 +257,20 @@
             .addTo(markersLayer);
           });
 
-          // ===== 熱度圖資料（顏色與圖例一致，權重用分數） =====
-          // 先算分位數，把分數拉開（避免全擠在中間）
-const sorted = pts.map(p => p.score).sort((a,b)=>a-b);
-const q = p => sorted.length ? sorted[Math.floor((sorted.length-1)*p)] : 0;
-// 10% 與 90% 分位數：過低/過高視為離群，壓掉影響
-const p10 = q(0.10), p90 = q(0.90);
-const rng = Math.max(1e-6, p90 - p10);
+          // ===== 熱度圖資料（分位數標準化 + gamma + 基底） =====
+          const sorted = pts.map(p => p.score).sort((a,b)=>a-b);
+          const q = t => sorted.length ? sorted[Math.floor((sorted.length-1)*t)] : 0;
+          const p10 = q(0.10), p90 = q(0.90);
+          const rng = Math.max(1e-6, p90 - p10);
 
-const heatData = pts.map(p => {
-  // 映射到 0~1
-  let s = (p.score - p10) / rng;
-  s = Math.max(0, Math.min(1, s));
-
-  // 提升權重：γ 小於 1 會放大對比（0.5~0.7 之間可調）
-  const gamma = 0.5;
-  let w = Math.pow(s, gamma);
-
-  // 給一個基底，確保弱點也能看到（0.12~0.2 之間可調）
-  w = 0.18 + 0.82 * w;
-
-  return [p.lat, p.lon, w];
-});
-
-heatLayer.setLatLngs(heatData);
-
+          const heatData = pts.map(p => {
+            let s = (p.score - p10) / rng;         // 映射到 0~1
+            s = Math.max(0, Math.min(1, s));
+            const gamma = 0.5;                     // 對比更高
+            let w = Math.pow(s, gamma);
+            w = 0.18 + 0.82 * w;                    // 基底值，弱點也顯示
+            return [p.lat, p.lon, w];
+          });
           heatLayer.setLatLngs(heatData);
 
           if(bounds.length) map.fitBounds(bounds, { padding:[20,20] });
@@ -278,7 +282,7 @@ heatLayer.setLatLngs(heatData);
         }
       }
 
-      // ===== CSV（含 UTF-8 BOM 防亂碼） =====
+      /* ----------------- CSV（含 BOM） ----------------- */
       function toCSV(rows){
         const header = ["rank","id","lat","lon","score_0to100"];
         const lines = [header.join(",")].concat(rows.map((c,i)=>
