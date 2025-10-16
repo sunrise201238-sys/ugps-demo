@@ -114,31 +114,23 @@
       document.getElementById("btn-zhtw").onclick = () => loadLang("zhtw");
       document.getElementById("btn-enus").onclick = () => loadLang("enus");
 
-      /* ----------------- Zoom-aware heat options -----------------
-         Goal:
-         - Keep very-close zoom look unchanged
-         - Avoid mid-zoom spike in color/radius
-         - Small when zoomed out
-      ---------------------------------------------------------------- */
-      function heatOptions(mode, z){
-        const Z = Math.max(3, Math.min(19, z || 13));
-
-        // Smooth, *sub-linear* growth so mid-zooms don't blow up.
-        // radius spans ≈12..58, with mid-zooms intentionally restrained.
-        const t = (Z - 3) / 16;                     // 0..1
-        const eased = Math.pow(t, 1.35);           // sub-linear
-        const radius = Math.round(12 + eased * (58 - 12));
-        const blur   = Math.round(radius * 0.55);
-
-        // Overlay (points mode): lighter; Solo (heat only): clearer
-        const isSolo = mode === "solo";
-        // Make intensity gently scale with zoom, but keep mid-zoom modest.
-        const base = isSolo ? 0.50 : 0.28;
-        const peak = isSolo ? 0.68 : 0.38;
-        const minOpacity = +(base + (peak - base) * Math.pow(t, 1.1)).toFixed(3);
-
-        return {
-          radius,
+      /* ----------------- Heat options that scale with zoom ----------------- */
+      // Radius curve: small when zoomed out, moderate mid-zoom, unchanged at very close zoom.
+      function radiusForZoom(z){
+        // piecewise smooth curve, clamped
+        if (z <= 9)  return 18;
+        if (z <= 12) return 18 + (z-9)*8;       // 18 -> 42
+        if (z <= 15) return 42 + (z-12)*6;      // 42 -> 60
+        if (z <= 18) return 60 + (z-15)*6;      // 60 -> 78
+        return 80;
+      }
+      function makeHeatLayer(dataset, profile){
+        const z = map.getZoom();
+        const r = Math.round(radiusForZoom(z));
+        const blur = Math.round(r * 0.6);
+        const minOpacity = profile === "overlay" ? 0.30 : 0.58; // overlay gentler, solo stronger
+        return L.heatLayer(dataset, {
+          radius: r,
           blur,
           maxZoom: 19,
           minOpacity,
@@ -149,11 +141,11 @@
             0.75: "#f97316",
             1.00: "#ef4444"
           }
-        };
+        });
       }
 
       /* -------------- 地圖與圖層 -------------- */
-      let map, markersLayer, heatLayer;
+      let map, markersLayer, heatLayer = null;
       window.__ugpsTop3 = [];
       window.__ugpsContext = {};
       let __heatSolo = [], __heatOverlay = [];
@@ -183,45 +175,33 @@
         map.getPane("points").style.zIndex = 650;
 
         markersLayer = L.layerGroup().addTo(map);
-        heatLayer = L.heatLayer([], heatOptions("overlay", 13)).addTo(map);
-
-        // Reconfigure heat on zoom to stop mid-zoom blow-up
-        map.on("zoomend", () => {
-          const z = map.getZoom();
-          const pointsMode = document.getElementById("btn-points").classList.contains("active");
-          const mode  = pointsMode ? "overlay" : "solo";
-          const data  = pointsMode ? __heatOverlay : __heatSolo;
-
-          // Recreate layer (plugin-safe) with zoom-aware options
-          if (heatLayer && map.hasLayer(heatLayer)) map.removeLayer(heatLayer);
-          heatLayer = L.heatLayer(data, heatOptions(mode, z)).addTo(map);
-
-          // Keep it hidden while in points mode
-          if (pointsMode && map.hasLayer(heatLayer)) map.removeLayer(heatLayer);
-        });
 
         map.setView([25.0478, 121.5170], 13);
+
+        // When zoom changes: if heat is visible, rebuild with same dataset & new radius
+        map.on("zoomend", () => {
+          if (!heatLayer) return;
+          const isHeatMode = document.getElementById("btn-heat").classList.contains("active");
+          if (!isHeatMode) return;
+          const dataset = __heatSolo; // heat mode uses the “solo” dataset
+          map.removeLayer(heatLayer);
+          heatLayer = makeHeatLayer(dataset, "solo").addTo(map);
+        });
       }
 
       function showPoints(){
         document.getElementById("btn-points").classList.add("active");
         document.getElementById("btn-heat").classList.remove("active");
         if (markersLayer && !map.hasLayer(markersLayer)) markersLayer.addTo(map);
-
-        // Ensure heat is removed in point mode
-        if (heatLayer && map.hasLayer(heatLayer)) map.removeLayer(heatLayer);
+        if (heatLayer && map.hasLayer(heatLayer)) map.removeLayer(heatLayer); // hide heat in point mode
       }
 
       function showHeat(){
         document.getElementById("btn-heat").classList.add("active");
         document.getElementById("btn-points").classList.remove("active");
-
-        // Solo profile with current zoom-aware tuning
-        const z = map.getZoom();
-        if (heatLayer && map.hasLayer(heatLayer)) map.removeLayer(heatLayer);
-        heatLayer = L.heatLayer(__heatSolo, heatOptions("solo", z)).addTo(map);
-
         if (markersLayer && map.hasLayer(markersLayer)) map.removeLayer(markersLayer);
+        if (heatLayer && map.hasLayer(heatLayer)) map.removeLayer(heatLayer);
+        heatLayer = makeHeatLayer(__heatSolo, "solo").addTo(map);
       }
 
       document.getElementById("btn-points").onclick = showPoints;
@@ -251,7 +231,7 @@
           document.getElementById("top.list").innerHTML =
             top.length ? top.map(toRow).join("") : `<small id="map.nodata">No data</small>`;
 
-          // Points (double-ring)
+          // Points (white halo + colored core with thin dark edge)
           markersLayer.clearLayers();
           const bounds = [];
           const coreR = 8, haloR = coreR + 3;
@@ -261,7 +241,6 @@
             bounds.push(ll);
             const fill = colorByScore01(p.score);
 
-            // thin white glow
             L.circleMarker(ll, {
               pane: "points",
               radius: haloR,
@@ -271,7 +250,6 @@
               opacity: 0.9
             }).addTo(markersLayer);
 
-            // solid color core with thin dark edge
             L.circleMarker(ll, {
               pane: "points",
               radius: coreR,
@@ -286,38 +264,30 @@
             .addTo(markersLayer);
           });
 
-          // Heat data (overlay vs solo weight mapping)
+          // Heat data (two weight mappings: overlay gentler, solo stronger)
           const sorted = pts.map(p => p.score).sort((a,b)=>a-b);
           const q = t => sorted.length ? sorted[Math.floor((sorted.length-1)*t)] : 0;
           const p10 = q(0.10), p90 = q(0.90);
           const rng = Math.max(1e-6, p90 - p10);
 
-          // overlay: gentler (lower base, higher gamma)
           __heatOverlay = pts.map(p => {
             let s = (p.score - p10) / rng; s = Math.max(0, Math.min(1, s));
             const gamma = 0.85;
             let w = Math.pow(s, gamma);
-            w = 0.05 + 0.70 * w;
-            return [p.lat, p.lon, w];
+            return [p.lat, p.lon, 0.05 + 0.70 * w];
           });
 
-          // solo: clearer (slightly lower gamma, higher base)
           __heatSolo = pts.map(p => {
             let s = (p.score - p10) / rng; s = Math.max(0, Math.min(1, s));
             const gamma = 0.55;
             let w = Math.pow(s, gamma);
-            w = 0.12 + 0.88 * w;
-            return [p.lat, p.lon, w];
+            return [p.lat, p.lon, 0.12 + 0.88 * w];
           });
 
-          // Seed the (hidden) heat with overlay profile for initial zoom
-          const z = map.getZoom();
-          if (heatLayer && map.hasLayer(heatLayer)) map.removeLayer(heatLayer);
-          heatLayer = L.heatLayer(__heatOverlay, heatOptions("overlay", z)).addTo(map);
-          // Then default to points mode (heat hidden)
-          showPoints();
-
           if(bounds.length) map.fitBounds(bounds, { padding:[20,20] });
+
+          // default: points mode (heat is hidden)
+          showPoints();
         }catch(e){
           document.getElementById("top.list").innerHTML =
             `<small style="color:#b00">讀取資料失敗：${e.message}</small>`;
