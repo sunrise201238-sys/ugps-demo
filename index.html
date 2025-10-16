@@ -43,36 +43,35 @@
       let lang = localStorage.getItem(LANG_KEY) || "zhtw";
 
       async function loadLang(l){
-        if(!supported.includes(l)) l = "zhtw";
-        // 讀對應 JSON
+        if (!supported.includes(l)) l = "zhtw";
         const res = await fetch(`./locales/${l}.json`);
         const dict = await res.json();
 
         // 用 key 把畫面文字替換
-        Object.keys(dict).forEach(k=>{
+        Object.keys(dict).forEach(k => {
           const el = document.getElementById(k);
-          if(el) el.textContent = dict[k];
+          if (el) el.textContent = dict[k];
         });
 
         // 切換按鈕樣式
-        document.getElementById("btn-zhtw").classList.toggle("active", l==="zhtw");
-        document.getElementById("btn-enus").classList.toggle("active", l==="enus");
+        document.getElementById("btn-zhtw").classList.toggle("active", l === "zhtw");
+        document.getElementById("btn-enus").classList.toggle("active", l === "enus");
 
         // 存記憶
         localStorage.setItem(LANG_KEY, l);
         lang = l;
       }
 
-      document.getElementById("btn-zhtw").onclick = ()=> loadLang("zhtw");
-      document.getElementById("btn-enus").onclick = ()=> loadLang("enus");
+      document.getElementById("btn-zhtw").onclick = () => loadLang("zhtw");
+      document.getElementById("btn-enus").onclick = () => loadLang("enus");
 
       // 預設載入
       loadLang(lang);
     </script>
-  <div style="position:fixed;right:16px;bottom:16px;background:#fff;border:1px solid #eee;border-radius:10px;padding:8px 12px;font-size:12px;color:#555">
-  <b id="meta.dataSource">資料來源</b>：OSM / Gov Open Data　|　
-  <b id="meta.version">版本</b>：v0.0.1
-</div>
 
+    <div style="position:fixed;right:16px;bottom:16px;background:#fff;border:1px solid #eee;border-radius:10px;padding:8px 12px;font-size:12px;color:#555">
+      <b id="meta.dataSource">資料來源</b>：OSM / Gov Open Data　|　
+      <b id="meta.version">版本</b>：v0.0.1
+    </div>
   </body>
 </html>
