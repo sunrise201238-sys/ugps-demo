@@ -9,5 +9,6 @@
   "map.legend.high": "High"
   "meta.dataSource": "Data source",
 "meta.version": "Version"
+"legend.title": "Legend"
 
 }
