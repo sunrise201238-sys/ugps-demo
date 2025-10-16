@@ -3,13 +3,21 @@
   "nav.home": "首頁",
   "nav.map": "地圖",
   "nav.export": "匯出",
+
   "lang.zhtw": "繁中",
   "lang.enus": "英文",
+
+  "legend.title": "圖例",
   "map.legend.low": "低",
   "map.legend.high": "高",
-  "meta.dataSource": "資料來源",
-  "meta.version": "版本",
-  "legend.title": "圖例",
+
+  "section.map": "地圖",
+  "map.subtitle": "UGPS 分數點位",
+
   "top.title": "優先格網 Top-3",
-  "top.export": "匯出 Top-3（CSV）"
+  "top.export": "匯出 Top-3（CSV）",
+  "top.exportTask": "匯出外展任務（CSV）",
+
+  "meta.dataSource": "資料來源",
+  "meta.version": "版本"
 }
