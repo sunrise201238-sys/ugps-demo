@@ -10,5 +10,6 @@
   "meta.dataSource": "Data source",
   "meta.version": "Version",
   "legend.title": "Legend",
-  "top.title": "Top-3 Cells"
+  "top.title": "Top-3 Cells",
+  "top.export": "Export Top-3 (CSV)"
 }
