@@ -17,7 +17,7 @@
       integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
       crossorigin=""
     ></script>
-    <!-- Leaflet Heatmap 插件 -->
+    <!-- Leaflet Heatmap -->
     <script src="https://unpkg.com/leaflet.heat/dist/leaflet-heat.js"></script>
 
     <style>
@@ -102,7 +102,6 @@
 
           document.title = dict["app.title"] || "UGPS";
           document.documentElement.setAttribute("lang", l === "zhtw" ? "zh-Hant" : "en");
-
           document.getElementById("btn-zhtw").classList.toggle("active", l==="zhtw");
           document.getElementById("btn-enus").classList.toggle("active", l==="enus");
           localStorage.setItem(LANG_KEY, l);
@@ -115,13 +114,31 @@
       document.getElementById("btn-zhtw").onclick = () => loadLang("zhtw");
       document.getElementById("btn-enus").onclick = () => loadLang("enus");
 
-      /* ------- 熱度配置（擴半徑 + 降密度） ------- */
-      function heatOptionsStatic(){
+      /* ------- Heat options (overlay vs solo) ------- */
+      // Radius expanded and two visual profiles:
+      //  - overlay: gentler/nerfed so the map below remains clear
+      //  - solo: more vivid when heatmap is shown on its own
+      function heatOptionsOverlay(){
         return {
-          radius: 90,          // ⬅︎ 擴大半徑（由 60 → 90）
-          blur: 54,            // 平滑對應半徑
+          radius: 72,          // bigger footprint
+          blur: 42,
           maxZoom: 19,
-          minOpacity: 0.45,    // 稍降整體不透明度，避免太厚重
+          minOpacity: 0.32,    // softer overlay
+          gradient: {
+            0.00: "#60a5fa",
+            0.35: "#93c5fd",
+            0.55: "#f59e0b",
+            0.75: "#f97316",
+            1.00: "#ef4444"
+          }
+        };
+      }
+      function heatOptionsSolo(){
+        return {
+          radius: 72,
+          blur: 42,
+          maxZoom: 19,
+          minOpacity: 0.65,    // stronger presence when alone
           gradient: {
             0.00: "#60a5fa",
             0.35: "#93c5fd",
@@ -136,9 +153,9 @@
       let map, markersLayer, heatLayer;
       window.__ugpsTop3 = [];
       window.__ugpsContext = {};
+      let __heatSolo = [], __heatOverlay = [];
 
       function colorByScore01(x){
-        // 與圖例一致：藍→黃→紅（以 HSL 漸變）
         const clrs = [[220,91,60],[38,90,55],[0,85,58]];
         const p = Math.max(0, Math.min(1, x));
         const t = p < 0.5 ? p*2 : (p-0.5)*2;
@@ -158,12 +175,12 @@
           attribution: '&copy; OpenStreetMap contributors'
         }).addTo(map);
 
-        // 讓點位顯示在熱度圖上方
+        // points above heat
         map.createPane("points");
         map.getPane("points").style.zIndex = 650;
 
         markersLayer = L.layerGroup().addTo(map);
-        heatLayer = L.heatLayer([], heatOptionsStatic()).addTo(map);
+        heatLayer = L.heatLayer([], heatOptionsOverlay()).addTo(map); // default config; we’ll toggle later
 
         map.setView([25.0478, 121.5170], 13);
       }
@@ -171,16 +188,18 @@
       function showPoints(){
         document.getElementById("btn-points").classList.add("active");
         document.getElementById("btn-heat").classList.remove("active");
-
         if (markersLayer && !map.hasLayer(markersLayer)) markersLayer.addTo(map);
-        if (heatLayer && map.hasLayer(heatLayer)) map.removeLayer(heatLayer); // 移除熱度圖（點位模式）
+        if (heatLayer && map.hasLayer(heatLayer)) map.removeLayer(heatLayer); // heat removed in point mode
       }
 
       function showHeat(){
         document.getElementById("btn-heat").classList.add("active");
         document.getElementById("btn-points").classList.remove("active");
 
-        if (heatLayer && !map.hasLayer(heatLayer)) heatLayer.addTo(map);
+        // swap to "solo" profile for stronger colors
+        if (heatLayer && map.hasLayer(heatLayer)) map.removeLayer(heatLayer);
+        heatLayer = L.heatLayer(__heatSolo, heatOptionsSolo()).addTo(map);
+
         if (markersLayer && map.hasLayer(markersLayer)) map.removeLayer(markersLayer);
       }
 
@@ -202,7 +221,7 @@
           const top = [...pts].sort((a,b)=>b.score-a.score).slice(0,3);
           window.__ugpsTop3 = top;
 
-          // 清單
+          // List
           const toRow = (c,i)=>`
             <div class="list-row">
               <span>${i+1}. ${c.id} (${c.lat.toFixed(4)}, ${c.lon.toFixed(4)})</span>
@@ -211,7 +230,7 @@
           document.getElementById("top.list").innerHTML =
             top.length ? top.map(toRow).join("") : `<small id="map.nodata">No data</small>`;
 
-          // ===== 點位（雙層圈） =====
+          // Points (double-ring)
           markersLayer.clearLayers();
           const bounds = [];
           const coreR = 8, haloR = coreR + 3;
@@ -221,7 +240,7 @@
             bounds.push(ll);
             const fill = colorByScore01(p.score);
 
-            // 白色外圈（光暈）
+            // thin white glow
             L.circleMarker(ll, {
               pane: "points",
               radius: haloR,
@@ -231,7 +250,7 @@
               opacity: 0.9
             }).addTo(markersLayer);
 
-            // 彩色核心 + 深色描邊
+            // solid color core with thin dark edge
             L.circleMarker(ll, {
               pane: "points",
               radius: coreR,
@@ -246,24 +265,36 @@
             .addTo(markersLayer);
           });
 
-          // ===== 熱度圖資料（擴半徑 + 降密度） =====
+          // Heat data (two weight mappings)
           const sorted = pts.map(p => p.score).sort((a,b)=>a-b);
           const q = t => sorted.length ? sorted[Math.floor((sorted.length-1)*t)] : 0;
           const p10 = q(0.10), p90 = q(0.90);
           const rng = Math.max(1e-6, p90 - p10);
 
-          const heatData = pts.map(p => {
-            let s = (p.score - p10) / rng;  // 0~1
-            s = Math.max(0, Math.min(1, s));
-            const gamma = 0.7;              // ⬅︎ 稍微壓低高值
+          // overlay: gentler (lower base, higher gamma)
+          __heatOverlay = pts.map(p => {
+            let s = (p.score - p10) / rng; s = Math.max(0, Math.min(1, s));
+            const gamma = 0.85;
             let w = Math.pow(s, gamma);
-            w = 0.12 + 0.58 * w;             // ⬅︎ 降基底與峰值，整體較不厚重
+            w = 0.05 + 0.70 * w;           // much lighter footprint on the map
             return [p.lat, p.lon, w];
           });
-          heatLayer.setLatLngs(heatData);
+
+          // solo: more vivid (slightly lower gamma, higher base)
+          __heatSolo = pts.map(p => {
+            let s = (p.score - p10) / rng; s = Math.max(0, Math.min(1, s));
+            const gamma = 0.55;
+            let w = Math.pow(s, gamma);
+            w = 0.12 + 0.88 * w;           // stands out when heatmap is alone
+            return [p.lat, p.lon, w];
+          });
+
+          // start with overlay config but we immediately enter points mode (which hides heat)
+          heatLayer.setOptions(heatOptionsOverlay());
+          heatLayer.setLatLngs(__heatOverlay);
 
           if(bounds.length) map.fitBounds(bounds, { padding:[20,20] });
-          showPoints(); // 預設顯示點位（點位模式下會移除熱度圖）
+          showPoints(); // default: points mode (no heat layer visible)
         }catch(e){
           document.getElementById("top.list").innerHTML =
             `<small style="color:#b00">讀取資料失敗：${e.message}</small>`;
@@ -308,7 +339,7 @@
         downloadCSV(`ugps-outreach-${(new Date()).toISOString().slice(0,10)}.csv`, toTaskCSV(rows, window.__ugpsContext||{}));
       };
 
-      // 首次載入
+      // init
       loadLang(lang);
       loadUGPS();
     </script>
