@@ -1,11 +1,7 @@
 {
   "version": "v0.0.1",
   "generatedAt": "2025-10-16T00:00:00Z",
-  "context": {
-    "timezone": "Asia/Taipei",
-    "scenario": "day-clear",
-    "note": "這是佔位示例；之後會由 GitHub Actions 產生。"
-  },
+  "context": { "timezone": "Asia/Taipei", "scenario": "day-clear" },
   "grid": [
     { "id": "A12", "lat": 25.0478, "lon": 121.5170, "score": 0.53 },
     { "id": "B07", "lat": 25.0486, "lon": 121.5151, "score": 0.41 },
