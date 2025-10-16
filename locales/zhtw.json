@@ -10,5 +10,6 @@
   "meta.dataSource": "資料來源",
   "meta.version": "版本",
   "legend.title": "圖例",
-  "top.title": "優先格網 Top-3"
+  "top.title": "優先格網 Top-3",
+  "top.export": "匯出 Top-3（CSV）"
 }
