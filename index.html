@@ -174,26 +174,39 @@
 
         // 縮放時依 zoom 重新建立 heatLayer（沿用舊資料）
         map.on("zoomend", () => {
-          const data = heatLayer._latlngs || [];
-          if (map.hasLayer(heatLayer)) map.removeLayer(heatLayer);
-          heatLayer = L.heatLayer(data, heatOptionsForZoom(map.getZoom())).addTo(map);
-        });
+  // 可能在 onAdd 尚未完成就觸發 zoomend，所以先做防呆
+  const data = (heatLayer && Array.isArray(heatLayer._latlngs)) ? heatLayer._latlngs : [];
+
+  // 只有在 layer 已經真正掛上去（有 _canvas）才移除，避免 removeChild(undefined)
+  if (heatLayer && heatLayer._canvas && map.hasLayer(heatLayer)) {
+    map.removeLayer(heatLayer);
+  }
+  heatLayer = L.heatLayer(data, heatOptionsForZoom(map.getZoom())).addTo(map);
+});
+
 
         map.setView([25.0478, 121.5170], 13);
       }
 
       function showPoints(){
-        document.getElementById("btn-points").classList.add("active");
-        document.getElementById("btn-heat").classList.remove("active");
-        markersLayer.addTo(map);
-        map.removeLayer(heatLayer);
-      }
-      function showHeat(){
-        document.getElementById("btn-heat").classList.add("active");
-        document.getElementById("btn-points").classList.remove("active");
-        heatLayer.addTo(map);
-        map.removeLayer(markersLayer);
-      }
+  document.getElementById("btn-points").classList.add("active");
+  document.getElementById("btn-heat").classList.remove("active");
+
+  if (markersLayer && !map.hasLayer(markersLayer)) markersLayer.addTo(map);
+  if (heatLayer && map.hasLayer(heatLayer)) {
+    // 只有在熱度圖真的掛上去時才移除
+    if (heatLayer._canvas) map.removeLayer(heatLayer);
+  }
+}
+
+function showHeat(){
+  document.getElementById("btn-heat").classList.add("active");
+  document.getElementById("btn-points").classList.remove("active");
+
+  if (heatLayer && !map.hasLayer(heatLayer)) heatLayer.addTo(map);
+  if (markersLayer && map.hasLayer(markersLayer)) map.removeLayer(markersLayer);
+}
+
       document.getElementById("btn-points").onclick = showPoints;
       document.getElementById("btn-heat").onclick = showHeat;
 
