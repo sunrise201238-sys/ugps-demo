@@ -13,6 +13,9 @@
 
   "section.map": "Map",
   "map.subtitle": "UGPS score points",
+  "map.toggle.points": "Points",
+  "map.toggle.heat": "Heatmap",
+  "map.nodata": "No data",
 
   "top.title": "Top-3 Cells",
   "top.export": "Export Top-3 (CSV)",
