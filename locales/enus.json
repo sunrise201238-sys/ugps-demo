@@ -7,4 +7,7 @@
   "lang.enus": "English (enus)",
   "map.legend.low": "Low",
   "map.legend.high": "High"
+  "meta.dataSource": "Data source",
+"meta.version": "Version"
+
 }
