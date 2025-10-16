@@ -13,6 +13,9 @@
 
   "section.map": "地圖",
   "map.subtitle": "UGPS 分數點位",
+  "map.toggle.points": "點位",
+  "map.toggle.heat": "熱度圖",
+  "map.nodata": "暫無資料",
 
   "top.title": "優先格網 Top-3",
   "top.export": "匯出 Top-3（CSV）",
