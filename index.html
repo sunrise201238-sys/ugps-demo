@@ -1,236 +1,346 @@
 <!doctype html>
 <html lang="zh-Hant">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>UGPS</title>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>UGPS</title>
 
-  <!-- Leaflet CSS -->
-  <link
-    rel="stylesheet"
-    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-    integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
-    crossorigin=""
-  />
+    <!-- Leaflet -->
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+      integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+      crossorigin=""
+    />
+    <script
+      src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+      integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+      crossorigin=""
+    ></script>
+    <!-- Leaflet Heatmap 插件 -->
+    <script src="https://unpkg.com/leaflet.heat/dist/leaflet-heat.js"></script>
 
-  <style>
-    :root{
-      --warm-1:#FFE08A;
-      --warm-2:#FF9F43;
-      --warm-3:#FF6B6B;
-    }
-    body{font-family:system-ui,-apple-system,"Segoe UI",Roboto,"Noto Sans TC",Arial,sans-serif;margin:24px}
-    .row{display:flex;gap:12px;align-items:center;margin-bottom:16px}
-    .badge{padding:6px 10px;border:1px solid #ddd;border-radius:999px;background:#fff;cursor:pointer}
-    .badge.active{background:#eef;border-color:#99f}
-    .card{border:1px solid #eee;border-radius:12px;padding:16px}
-    small{color:#777}
-
-    .legend-bar{
-      height:8px;border-radius:999px;width:100%;
-      background:linear-gradient(90deg,var(--warm-1) 0%,var(--warm-2) 55%,var(--warm-3) 100%);
-    }
-
-    /* 點位：彩色實心 + 黑外圈(2px) + 白外圈(2px)，顏色大、邊緣薄 */
-    .ugps-dot{
-      width:20px;height:20px;border-radius:50%;
-      background:var(--fill,#FF9F43);
-      box-shadow:
-        0 0 0 2px #000,
-        0 0 0 4px #fff;
-      transform:translate(-10px,-10px);
-    }
-
-    /* map 必須有固定高度 */
-    #map{
-      height:560px;
-      min-height:360px;
-      border-radius:12px;
-      overflow:hidden;
-      background:#f7f7f7;
-    }
-  </style>
-</head>
-<body>
-  <div class="row">
-    <h1 id="app.title">UGPS</h1>
-    <div style="margin-left:auto">
-      <button id="btn-zhtw" class="badge">zhtw</button>
-      <button id="btn-enus" class="badge">enus</button>
-    </div>
-  </div>
-
-  <div class="row">
-    <a id="nav.home" href="#">首頁</a>
-    <a id="nav.map" href="#" style="margin-left:12px">地圖</a>
-    <a id="nav.export" href="#" style="margin-left:12px">匯出</a>
-  </div>
-
-  <div class="card" aria-label="legend">
-    <b id="legend.title">Legend</b>
-    <div class="row" style="margin-top:8px">
-      <small id="map.legend.low">低</small>
-      <div class="legend-bar" title="Low → High"></div>
-      <small id="map.legend.high">高</small>
-    </div>
-  </div>
-
-  <div class="card" style="margin-top:16px">
-    <div class="row" style="justify-content:space-between;align-items:center;margin-bottom:10px">
-      <div style="font-weight:600"><span id="map.title">地圖</span> · <small>UGPS 分數點位</small></div>
-      <div>
-        <button id="btn-points" class="badge active">點位</button>
-        <button id="btn-heat"   class="badge">熱度圖</button>
+    <style>
+      :root { --card-b:#eee; --muted:#777; }
+      body { font-family: system-ui,-apple-system,"Segoe UI",Roboto,"Noto Sans TC",Arial,sans-serif; margin:24px; }
+      .row { display:flex; gap:12px; align-items:center; margin-bottom:16px; }
+      .badge { padding:6px 10px; border:1px solid #ddd; border-radius:999px; background:#fff; cursor:pointer; }
+      .badge.active { background:#eef; border-color:#99f; }
+      .card { border:1px solid var(--card-b); border-radius:12px; padding:16px; }
+      small{color:var(--muted)}
+      #map { width:100%; height:420px; border-radius:12px; }
+      .list-row { display:flex; justify-content:space-between; padding:6px 8px; border:1px solid #eee; border-radius:8px; margin-top:6px }
+    </style>
+  </head>
+  <body>
+    <!-- 標題 + 語言切換 -->
+    <div class="row">
+      <h1 id="app.title">UGPS</h1>
+      <div style="margin-left:auto">
+        <button id="btn-zhtw" class="badge">zhtw</button>
+        <button id="btn-enus" class="badge">enus</button>
       </div>
     </div>
-    <div id="map"></div>
-  </div>
 
-  <div class="card" style="margin-top:16px">
-    <b id="top3.title">優先格網 Top-3</b>
-    <ol id="top3"></ol>
-  </div>
+    <!-- 導覽 -->
+    <div class="row">
+      <a id="nav.home" href="#">首頁</a>
+      <a id="nav.map" href="#" style="margin-left:12px">地圖</a>
+      <a id="nav.export" href="#" style="margin-left:12px">匯出</a>
+    </div>
 
-  <div style="position:fixed;right:16px;bottom:16px;background:#fff;border:1px solid #eee;border-radius:10px;padding:8px 12px;font-size:12px;color:#555">
-    <b id="meta.dataSource">資料來源</b>：OSM / Gov Open Data　|　
-    <b id="meta.version">版本</b>：v0.0.1
-  </div>
+    <!-- 圖例 -->
+    <div class="card">
+      <b id="legend.title">Legend</b>
+      <div class="row" style="margin-top:8px">
+        <small id="map.legend.low">Low</small>
+        <div style="flex:1;height:8px;background:linear-gradient(90deg,#60a5fa,#f59e0b,#ef4444);border-radius:999px"></div>
+        <small id="map.legend.high">High</small>
+      </div>
+    </div>
 
-  <!-- Leaflet & heat scripts DEFERRED so HTML exists first -->
-  <script defer src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
-    integrity="sha256-o9N1j7kGStb6ZkM00syQFhGZ8ZQ8v4v1jz7G8Q1rC2c=" crossorigin=""></script>
-  <script defer src="https://unpkg.com/leaflet.heat/dist/leaflet-heat.js"></script>
+    <!-- 地圖 -->
+    <div class="card" style="margin-top:16px">
+      <div class="row" style="margin:0 0 8px 0">
+        <b id="section.map">Map</b>
+        <small id="map.subtitle" style="margin-left:8px">UGPS score points</small>
+        <div style="margin-left:auto">
+          <button id="btn-points" class="badge active"><span id="map.toggle.points">Points</span></button>
+          <button id="btn-heat" class="badge"><span id="map.toggle.heat">Heatmap</span></button>
+        </div>
+      </div>
+      <div id="map"></div>
+    </div>
 
-  <script defer>
-  document.addEventListener('DOMContentLoaded', () => {
-    /* -------- i18n (不讓失敗打斷地圖) -------- */
-    const LANG_KEY = "ugps_lang";
-    const supported = ["zhtw","enus"];
-    let lang = localStorage.getItem(LANG_KEY) || "zhtw";
+    <!-- Top-3 + 匯出 -->
+    <div class="card" id="top.card" style="margin-top:16px">
+      <div class="row" style="margin:0 0 8px 0">
+        <b id="top.title">Top-3</b>
+        <button id="top.exportTask" class="badge" style="margin-left:auto">Export tasks</button>
+        <button id="top.export" class="badge">Export</button>
+      </div>
+      <div id="top.list"><small>Loading…</small></div>
+    </div>
 
-    async function loadLang(l){
-      try{
-        if(!supported.includes(l)) l = "zhtw";
-        const res = await fetch(`./locales/${l}.json`, {cache:"no-cache"});
-        if(!res.ok) throw new Error(res.statusText);
-        const dict = await res.json();
-        for (const k of Object.keys(dict)){
-          const el = document.getElementById(k);
-          if (el) el.textContent = dict[k];
+    <script>
+      const LANG_KEY = "ugps_lang";
+      const supported = ["zhtw","enus"];
+      let lang = localStorage.getItem(LANG_KEY) || "zhtw";
+
+      /* ----------------- 語言 ----------------- */
+      async function loadLang(l){
+        try{
+          if(!supported.includes(l)) l = "zhtw";
+          const res = await fetch(`./locales/${l}.json`, { cache:"no-cache" });
+          if(!res.ok) throw new Error(`fetch ${l}.json failed: ${res.status}`);
+          const dict = await res.json();
+
+          Object.keys(dict).forEach(k=>{
+            const el = document.getElementById(k);
+            if(el) el.textContent = dict[k];
+          });
+
+          document.title = dict["app.title"] || "UGPS";
+          document.documentElement.setAttribute("lang", l === "zhtw" ? "zh-Hant" : "en");
+
+          document.getElementById("btn-zhtw").classList.toggle("active", l==="zhtw");
+          document.getElementById("btn-enus").classList.toggle("active", l==="enus");
+          localStorage.setItem(LANG_KEY, l);
+          lang = l;
+        }catch(e){
+          alert("載入語言檔失敗，請重整或稍後再試。\n" + e.message);
+          console.error(e);
         }
-        document.title = dict["app.title"] || "UGPS";
-        document.documentElement.setAttribute("lang", l==="zhtw" ? "zh-Hant" : "en");
-        document.getElementById("btn-zhtw").classList.toggle("active", l==="zhtw");
-        document.getElementById("btn-enus").classList.toggle("active", l==="enus");
-        localStorage.setItem(LANG_KEY, l);
-        lang = l;
-      }catch(e){
-        console.warn("loadLang failed:", e);
       }
-    }
-    document.getElementById("btn-zhtw").onclick = ()=> loadLang("zhtw");
-    document.getElementById("btn-enus").onclick = ()=> loadLang("enus");
-    loadLang(lang);
+      document.getElementById("btn-zhtw").onclick = () => loadLang("zhtw");
+      document.getElementById("btn-enus").onclick = () => loadLang("enus");
 
-    /* -------- 著色 -------- */
-    function hexToRgb(h){const m=/^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(h);return m?{r:parseInt(m[1],16),g:parseInt(m[2],16),b:parseInt(m[3],16)}:null}
-    function rgbToHex({r,g,b}){const to=v=>v.toString(16).padStart(2,"0");return `#${to(r)}${to(g)}${to(b)}`}
-    function lerp(a,b,t){return a+(b-a)*t}
-    function lerpColor(a,b,t){const ca=hexToRgb(a),cb=hexToRgb(b);return rgbToHex({r:Math.round(lerp(ca.r,cb.r,t)),g:Math.round(lerp(ca.g,cb.g,t)),b:Math.round(lerp(ca.b,cb.b,t))})}
-    function scoreColor(t){
-      const s=Math.max(0,Math.min(1,t));
-      if(s<0.5) return lerpColor("#FFE08A","#FF9F43",s/0.5);
-      return lerpColor("#FF9F43","#FF6B6B",(s-0.5)/0.5);
-    }
-
-    /* -------- 示例資料 -------- */
-    const points = [
-      {lat:25.0495, lng:121.5165, score:.85},
-      {lat:25.0476, lng:121.5170, score:.65},
-      {lat:25.0486, lng:121.5151, score:.55},
-      {lat:25.0489, lng:121.5178, score:.75},
-      {lat:25.0459, lng:121.5136, score:.40}
-    ];
-
-    /* -------- Map -------- */
-    let map;
-    try{
-      map = L.map('map', {zoomControl:true}).setView([25.0479,121.5171], 16);
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        maxZoom: 19, attribution: '&copy; OpenStreetMap contributors'
-      }).addTo(map);
-      // 保險：確保可見大小正確
-      setTimeout(()=>map.invalidateSize(), 50);
-    }catch(e){
-      console.error("Leaflet init failed:", e);
-      return; // 沒地圖就不繼續
-    }
-
-    /* 點位層 */
-    const pointsLayer = L.layerGroup();
-    function drawPoints(){
-      pointsLayer.clearLayers();
-      points.forEach(p=>{
-        const color = scoreColor(p.score);
-        const icon = L.divIcon({
-          className:'',
-          html:`<span class="ugps-dot" style="--fill:${color}"></span>`,
-          iconSize:[20,20], iconAnchor:[10,10]
-        });
-        L.marker([p.lat,p.lng], {icon}).addTo(pointsLayer);
-      });
-    }
-    drawPoints();
-    pointsLayer.addTo(map);
-
-    /* 熱度圖（暖色、不藍） */
-    const HEAT_GRADIENT = {0:'#FFE08A',0.5:'#FF9F43',1:'#FF6B6B'};
-    let heatLayer=null;
-    function addHeat(){
-      if(heatLayer) map.removeLayer(heatLayer);
-      const data = points.map(p=>[p.lat,p.lng,p.score]);
-      heatLayer = L.heatLayer(data,{radius:42, blur:28, maxZoom:19, gradient:HEAT_GRADIENT}).addTo(map);
-    }
-
-    /* 切換 */
-    const btnPoints=document.getElementById('btn-points');
-    const btnHeat=document.getElementById('btn-heat');
-
-    function showPoints(){
-      btnPoints.classList.add('active');
-      btnHeat.classList.remove('active');
-      if(heatLayer){map.removeLayer(heatLayer);heatLayer=null;}
-      if(!map.hasLayer(pointsLayer)) pointsLayer.addTo(map);
-    }
-    function showHeat(){
-      btnHeat.classList.add('active');
-      btnPoints.classList.remove('active');
-      if(map.hasLayer(pointsLayer)) map.removeLayer(pointsLayer);
-      addHeat();
-    }
-    btnPoints.addEventListener('click', showPoints);
-    btnHeat.addEventListener('click', showHeat);
-
-    map.on('zoomend', ()=>{
-      if(heatLayer){
-        const data = heatLayer._latlngs;
-        map.removeLayer(heatLayer);
-        heatLayer = L.heatLayer(data,{radius:42, blur:28, maxZoom:19, gradient:HEAT_GRADIENT}).addTo(map);
+      /* ------- 地圖/熱度參數：依縮放自動調整 ------- */
+      function heatOptionsForZoom(z){
+        // 半徑隨 zoom 放大；限制在 20~72 之間
+        const radius = Math.max(20, Math.min(72, Math.round(22 + (z - 11) * 6)));
+        const blur   = Math.round(radius * 0.55);     // 跟著半徑走
+        const minOpacity = Math.max(0.45, Math.min(0.75, 0.45 + (z - 12) * 0.05)); // 放大越不透明
+        return {
+          radius,
+          blur,
+          maxZoom: 19,
+          minOpacity,
+          gradient: {
+            0.00: "#60a5fa",
+            0.35: "#93c5fd",
+            0.55: "#f59e0b",
+            0.75: "#f97316",
+            1.00: "#ef4444"
+          }
+        };
       }
-    });
 
-    /* Top-3（示例） */
-    const top3El = document.getElementById('top3');
-    function renderTop3(){
-      top3El.innerHTML='';
-      points.slice(0,3).forEach((p,i)=>{
-        const li=document.createElement('li');
-        li.textContent=`${i+1}. C${i+19} (${p.lat.toFixed(4)}, ${p.lng.toFixed(4)})`;
-        top3El.appendChild(li);
-      });
-    }
-    renderTop3();
-  });
-  </script>
-</body>
+      /* -------------- 地圖與圖層 -------------- */
+      let map, markersLayer, heatLayer;
+      window.__ugpsTop3 = [];
+      window.__ugpsContext = {};
+      let __points = [];
+
+      function colorByScore01(x){
+        // 與圖例一致：藍→黃→紅（以 HSL 漸變）
+        const clrs = [[220,91,60],[38,90,55],[0,85,58]];
+        const p = Math.max(0, Math.min(1, x));
+        const t = p < 0.5 ? p*2 : (p-0.5)*2;
+        const a = p < 0.5 ? clrs[0] : clrs[1];
+        const b = p < 0.5 ? clrs[1] : clrs[2];
+        const h = a[0] + (b[0]-a[0])*t;
+        const s = a[1] + (b[1]-a[1])*t;
+        const l = a[2] + (b[2]-a[2])*t;
+        return `hsl(${h}deg ${s}% ${l}%)`;
+      }
+
+      function ensureMap(){
+        if(map) return;
+        map = L.map("map");
+        L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+          maxZoom: 19,
+          attribution: '&copy; OpenStreetMap contributors'
+        }).addTo(map);
+
+        // 讓點位顯示在熱度圖上方
+        map.createPane("points");
+        map.getPane("points").style.zIndex = 650;
+
+        markersLayer = L.layerGroup().addTo(map);
+
+        // 依目前 zoom 建立一次 heatLayer
+        heatLayer = L.heatLayer([], heatOptionsForZoom(map.getZoom())).addTo(map);
+
+        // 縮放時依 zoom 重新建立 heatLayer（沿用舊資料）
+        map.on("zoomend", () => {
+  // 可能在 onAdd 尚未完成就觸發 zoomend，所以先做防呆
+  const data = (heatLayer && Array.isArray(heatLayer._latlngs)) ? heatLayer._latlngs : [];
+
+  // 只有在 layer 已經真正掛上去（有 _canvas）才移除，避免 removeChild(undefined)
+  if (heatLayer && heatLayer._canvas && map.hasLayer(heatLayer)) {
+    map.removeLayer(heatLayer);
+  }
+  heatLayer = L.heatLayer(data, heatOptionsForZoom(map.getZoom())).addTo(map);
+});
+
+
+        map.setView([25.0478, 121.5170], 13);
+      }
+
+      function showPoints(){
+  document.getElementById("btn-points").classList.add("active");
+  document.getElementById("btn-heat").classList.remove("active");
+
+  if (markersLayer && !map.hasLayer(markersLayer)) markersLayer.addTo(map);
+  if (heatLayer && map.hasLayer(heatLayer)) {
+    // 只有在熱度圖真的掛上去時才移除
+    if (heatLayer._canvas) map.removeLayer(heatLayer);
+  }
+}
+
+function showHeat(){
+  document.getElementById("btn-heat").classList.add("active");
+  document.getElementById("btn-points").classList.remove("active");
+
+  if (heatLayer && !map.hasLayer(heatLayer)) heatLayer.addTo(map);
+  if (markersLayer && map.hasLayer(markersLayer)) map.removeLayer(markersLayer);
+}
+
+      document.getElementById("btn-points").onclick = showPoints;
+      document.getElementById("btn-heat").onclick = showHeat;
+
+      /* -------------- 載入資料 + 繪製 -------------- */
+      async function loadUGPS(){
+        try{
+          ensureMap();
+          const res = await fetch("./data/ugps.json", { cache:"no-cache" });
+          if(!res.ok) throw new Error("fetch ugps.json failed");
+          const data = await res.json();
+          window.__ugpsContext = data.context || {};
+
+          const pts = Array.isArray(data.grid) ? data.grid : [];
+          __points = pts;
+
+          // Top-3
+          const top = [...pts].sort((a,b)=>b.score-a.score).slice(0,3);
+          window.__ugpsTop3 = top;
+
+          // 清單
+          const toRow = (c,i)=>`
+            <div class="list-row">
+              <span>${i+1}. ${c.id} (${c.lat.toFixed(4)}, ${c.lon.toFixed(4)})</span>
+              <b>${(c.score*100).toFixed(0)}</b>
+            </div>`;
+          document.getElementById("top.list").innerHTML =
+            top.length ? top.map(toRow).join("") : `<small id="map.nodata">No data</small>`;
+
+          // ===== 點位（雙層圈） =====
+          markersLayer.clearLayers();
+          const bounds = [];
+          const coreR = 8, haloR = coreR + 3;
+
+          pts.forEach(p=>{
+            const ll = [p.lat, p.lon];
+            bounds.push(ll);
+            const fill = colorByScore01(p.score);
+
+            // 白色外圈（光暈）
+            L.circleMarker(ll, {
+              pane: "points",
+              radius: haloR,
+              color: "#ffffff",
+              weight: 5,
+              fill: false,
+              opacity: 0.9
+            }).addTo(markersLayer);
+
+            // 彩色核心 + 深色描邊
+            L.circleMarker(ll, {
+              pane: "points",
+              radius: coreR,
+              color: "#111",
+              weight: 1.6,
+              fillColor: fill,
+              fillOpacity: 0.95
+            })
+            .bindPopup(
+              `<b>${p.id}</b><br/>${p.lat.toFixed(5)}, ${p.lon.toFixed(5)}<br/>Score: ${(p.score*100).toFixed(0)}`
+            )
+            .addTo(markersLayer);
+          });
+
+          // ===== 熱度圖資料（分位數標準化 + gamma + 基底） =====
+          const sorted = pts.map(p => p.score).sort((a,b)=>a-b);
+          const q = t => sorted.length ? sorted[Math.floor((sorted.length-1)*t)] : 0;
+          const p10 = q(0.10), p90 = q(0.90);
+          const rng = Math.max(1e-6, p90 - p10);
+
+          const heatData = pts.map(p => {
+            let s = (p.score - p10) / rng;         // 映射到 0~1
+            s = Math.max(0, Math.min(1, s));
+            const gamma = 0.5;                     // 對比更高
+            let w = Math.pow(s, gamma);
+            w = 0.18 + 0.82 * w;                    // 基底值，弱點也顯示
+            return [p.lat, p.lon, w];
+          });
+          heatLayer.setLatLngs(heatData);
+
+          if(bounds.length) map.fitBounds(bounds, { padding:[20,20] });
+          showPoints(); // 預設顯示點位
+        }catch(e){
+          document.getElementById("top.list").innerHTML =
+            `<small style="color:#b00">讀取資料失敗：${e.message}</small>`;
+          console.error(e);
+        }
+      }
+
+      /* ----------------- CSV（含 BOM） ----------------- */
+      function toCSV(rows){
+        const header = ["rank","id","lat","lon","score_0to100"];
+        const lines = [header.join(",")].concat(rows.map((c,i)=>
+          [i+1, c.id, c.lat, c.lon, Math.round(c.score*100)].join(",")
+        ));
+        return lines.join("\r\n");
+      }
+      function downloadCSV(filename, text){
+        const BOM = "\uFEFF";
+        const blob = new Blob([BOM + text], { type: "text/csv;charset=utf-8;" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url; a.download = filename;
+        document.body.appendChild(a); a.click();
+        document.body.removeChild(a); URL.revokeObjectURL(url);
+      }
+      function toTaskCSV(rows, context){
+        const header = ["datetime_window","cell_id","lat","lon","score_0to100","scenario","note"];
+        const dt = new Date().toISOString().slice(0,16).replace("T"," ");
+        const scen = (context && context.scenario) || "unknown";
+        const lines = [header.join(",")].concat(rows.map((c,i)=>
+          [`${dt} ~ +2h`, c.id, c.lat, c.lon, Math.round(c.score*100), scen, `Rank ${i+1}`].join(",")
+        ));
+        return lines.join("\r\n");
+      }
+      document.getElementById("top.export").onclick = ()=>{
+        const rows = window.__ugpsTop3 || [];
+        if(!rows.length){ alert("目前沒有資料可匯出"); return; }
+        downloadCSV(`ugps-top3-${(new Date()).toISOString().slice(0,10)}.csv`, toCSV(rows));
+      };
+      document.getElementById("top.exportTask").onclick = ()=>{
+        const rows = window.__ugpsTop3 || [];
+        if(!rows.length){ alert("目前沒有資料可匯出"); return; }
+        downloadCSV(`ugps-outreach-${(new Date()).toISOString().slice(0,10)}.csv`, toTaskCSV(rows, window.__ugpsContext||{}));
+      };
+
+      // 首次載入
+      loadLang(lang);
+      loadUGPS();
+    </script>
+
+    <!-- 右下角版本/來源 -->
+    <div style="position:fixed;right:16px;bottom:16px;background:#fff;border:1px solid #eee;border-radius:10px;padding:8px 12px;font-size:12px;color:#555">
+      <b id="meta.dataSource">資料來源</b>：OSM / Gov Open Data　|　
+      <b id="meta.version">版本</b>：v0.0.1
+    </div>
+  </body>
 </html>
