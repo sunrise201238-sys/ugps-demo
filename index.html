@@ -54,12 +54,12 @@
       <b id="legend.title">Legend</b>
       <div class="row" style="margin-top:8px">
         <small id="map.legend.low">Low</small>
-        <div style="flex:1;height:8px;background:linear-gradient(90deg,#9cf,#fd6,#f66);border-radius:999px"></div>
+        <div style="flex:1;height:8px;background:linear-gradient(90deg,#60a5fa,#f59e0b,#ef4444);border-radius:999px"></div>
         <small id="map.legend.high">High</small>
       </div>
     </div>
 
-    <!-- 地圖區 -->
+    <!-- 地圖 -->
     <div class="card" style="margin-top:16px">
       <div class="row" style="margin:0 0 8px 0">
         <b id="section.map">Map</b>
@@ -72,7 +72,7 @@
       <div id="map"></div>
     </div>
 
-    <!-- Top-3 -->
+    <!-- Top-3 + 匯出 -->
     <div class="card" id="top.card" style="margin-top:16px">
       <div class="row" style="margin:0 0 8px 0">
         <b id="top.title">Top-3</b>
@@ -122,6 +122,7 @@
       let __points = [];
 
       function colorByScore01(x){
+        // 與圖例一致：藍→黃→紅
         const clrs = [[220,91,60],[38,90,55],[0,85,58]];
         const p = Math.max(0, Math.min(1, x));
         const t = p < 0.5 ? p*2 : (p-0.5)*2;
@@ -140,8 +141,21 @@
           maxZoom: 19,
           attribution: '&copy; OpenStreetMap contributors'
         }).addTo(map);
+
+        // 讓點位顯示在熱度圖之上
+        map.createPane("points");
+        map.getPane("points").style.zIndex = 650;
+
         markersLayer = L.layerGroup().addTo(map);
-        heatLayer = L.heatLayer([], { radius: 20, blur: 25, maxZoom: 17, minOpacity: 0.3 }).addTo(map);
+        heatLayer = L.heatLayer([], {
+          radius: 22,
+          blur: 26,
+          maxZoom: 17,
+          minOpacity: 0.28,
+          // 與圖例相同的漸層
+          gradient: { 0.0: "#60a5fa", 0.5: "#f59e0b", 1.0: "#ef4444" }
+        }).addTo(map);
+
         map.setView([25.0478, 121.5170], 13);
       }
 
@@ -184,30 +198,52 @@
           document.getElementById("top.list").innerHTML =
             top.length ? top.map(toRow).join("") : `<small id="map.nodata">No data</small>`;
 
-          // 點位層
+          // ===== 點位（雙層圈） =====
           markersLayer.clearLayers();
           const bounds = [];
+          const coreR = 8, haloR = coreR + 3;
+
           pts.forEach(p=>{
             const ll = [p.lat, p.lon];
             bounds.push(ll);
+            const fill = colorByScore01(p.score);
+
+            // 白色外圈（光暈）
             L.circleMarker(ll, {
-              radius: 7,
-              color: colorByScore01(p.score),
-              fillColor: colorByScore01(p.score),
-              fillOpacity: 0.9,
-              weight: 1
-            }).bindPopup(
+              pane: "points",
+              radius: haloR,
+              color: "#ffffff",
+              weight: 5,
+              fill: false,
+              opacity: 0.9
+            }).addTo(markersLayer);
+
+            // 彩色核心 + 深色描邊
+            L.circleMarker(ll, {
+              pane: "points",
+              radius: coreR,
+              color: "#111",
+              weight: 1.6,
+              fillColor: fill,
+              fillOpacity: 0.95
+            })
+            .bindPopup(
               `<b>${p.id}</b><br/>${p.lat.toFixed(5)}, ${p.lon.toFixed(5)}<br/>Score: ${(p.score*100).toFixed(0)}`
-            ).addTo(markersLayer);
+            )
+            .addTo(markersLayer);
           });
 
-          // 熱度層（lat, lon, weight）
-          const heatData = pts.map(p => [p.lat, p.lon, Math.max(0.05, Math.min(1, p.score))]);
+          // ===== 熱度圖資料（顏色與圖例一致，權重用分數） =====
+          const heatData = pts.map(p => {
+            const s = Math.max(0.01, Math.min(1, p.score));
+            const gamma = 0.8; // 0.7~1.0 可調
+            const w = Math.pow(s, gamma);
+            return [p.lat, p.lon, w];
+          });
           heatLayer.setLatLngs(heatData);
 
           if(bounds.length) map.fitBounds(bounds, { padding:[20,20] });
-          // 預設顯示點位
-          showPoints();
+          showPoints(); // 預設顯示點位
         }catch(e){
           document.getElementById("top.list").innerHTML =
             `<small style="color:#b00">讀取資料失敗：${e.message}</small>`;
