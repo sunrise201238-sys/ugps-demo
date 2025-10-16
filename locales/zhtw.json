@@ -7,4 +7,7 @@
   "lang.enus": "英文",
   "map.legend.low": "低",
   "map.legend.high": "高"
+  "meta.dataSource": "資料來源",
+"meta.version": "版本"
+
 }
