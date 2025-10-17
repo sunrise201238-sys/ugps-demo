@@ -1,0 +1,55 @@
+{
+  "default": {
+    "GROUP_W": {
+      "pull": 0.35,
+      "cover": 0.3,
+      "recency": 0.25,
+      "friction": 0.1
+    },
+    "INTRA_W": {
+      "pull": {
+        "service_proximity": 0.45,
+        "transit_hub": 0.35,
+        "late_night_econ": 0.2
+      },
+      "cover": {
+        "overhead_area": 0.45,
+        "recessed_edges": 0.35,
+        "lighting_mid": 0.2
+      },
+      "friction": {
+        "patrol_density": 0.6,
+        "cctv_density": 0.4
+      },
+      "recency": {
+        "reports_7d": 0.45,
+        "outreach_hits_14d": 0.35,
+        "night_flow_delta": 0.2
+      }
+    }
+  },
+  "night-clear": {
+    "GROUP_W": {
+      "pull": 0.25,
+      "cover": 0.35,
+      "recency": 0.3,
+      "friction": 0.1
+    }
+  },
+  "day-rain": {
+    "GROUP_W": {
+      "pull": 0.25,
+      "cover": 0.4,
+      "recency": 0.25,
+      "friction": 0.1
+    }
+  },
+  "night-rain": {
+    "GROUP_W": {
+      "pull": 0.15,
+      "cover": 0.4,
+      "recency": 0.35,
+      "friction": 0.1
+    }
+  }
+}
