@@ -4,85 +4,91 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title>UGPS</title>
+
+    <!-- Leaflet core -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+    <!-- Heatmap plugin -->
     <script src="https://unpkg.com/leaflet.heat/dist/leaflet-heat.js"></script>
+
     <style>
-      :root { --card-b:#eee; --muted:#777; }
-      body { font-family: system-ui,-apple-system,"Segoe UI",Roboto,"Noto Sans TC",Arial,sans-serif; margin:24px; }
-      .row { display:flex; gap:12px; align-items:center; margin-bottom:16px; flex-wrap:wrap; }
-      .badge { padding:6px 10px; border:1px solid #ddd; border-radius:999px; background:#fff; cursor:pointer; }
+      :root { --border:#e5e7eb; --muted:#6b7280; }
+      body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans TC", Arial, sans-serif; margin:24px; }
+      .row { display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
+      .nav a { margin-right:12px; }
+      .badge { padding:6px 10px; border:1px solid var(--border); border-radius:999px; background:#fff; cursor:pointer; }
       .badge.active { background:#eef; border-color:#99f; }
-      .card { border:1px solid var(--card-b); border-radius:12px; padding:16px; }
-      small{color:var(--muted)}
-      #map { width:100%; height:460px; border-radius:12px; }
-      .list-row { display:flex; justify-content:space-between; padding:6px 8px; border:1px solid #eee; border-radius:8px; margin-top:6px }
-      select{ padding:6px 8px; border-radius:10px; border:1px solid #ddd; }
-      label{ font-size:14px; color:#555; }
+      .card { border:1px solid var(--border); border-radius:12px; padding:16px; margin-top:16px; }
+      small { color:var(--muted); }
+      select { padding:6px 8px; border-radius:10px; border:1px solid var(--border); }
+      #map { width:100%; height:520px; border-radius:12px; }
+      .list-row { display:flex; justify-content:space-between; padding:6px 8px; border:1px solid var(--border); border-radius:8px; margin-top:6px }
+      .toolbar { margin-left:auto; display:flex; gap:12px; align-items:center; }
     </style>
   </head>
   <body>
     <div class="row">
-      <h1 id="app.title">UGPS</h1>
-      <div style="margin-left:auto">
+      <h1 id="app.title" style="margin:0">UGPS：街頭停留潛勢指標</h1>
+      <div class="toolbar">
         <button id="btn-zhtw" class="badge">zhtw</button>
         <button id="btn-enus" class="badge">enus</button>
       </div>
     </div>
 
-    <div class="row">
+    <div class="row nav" style="margin-top:8px">
       <a id="nav.home" href="#">首頁</a>
-      <a id="nav.map" href="#" style="margin-left:12px">地圖</a>
-      <a id="nav.export" href="#" style="margin-left:12px">匯出</a>
+      <a id="nav.map" href="#">地圖</a>
+      <a id="nav.export" href="#">匯出</a>
     </div>
 
     <div class="card">
-      <div class="row" style="margin-bottom:4px">
-        <b id="legend.title">Legend</b>
-        <div style="margin-left:auto; display:flex; gap:12px; align-items:center">
+      <div class="row" style="margin-bottom:8px">
+        <b id="legend.title">圖例</b>
+        <div class="toolbar">
           <label for="region"><span id="filters.region">Region</span>：</label>
           <select id="region">
             <option value="taipei" data-center="25.0478,121.5170" id="region.taipei">Taipei</option>
-            <option value="newtaipei" data-center="25.0169,121.4628" id="region.newtaipei">New Taipei</option>
-            <option value="taoyuan" data-center="24.9937,121.2969" id="region.taoyuan">Taoyuan</option>
-            <option value="taichung" data-center="24.1477,120.6736" id="region.taichung">Taichung</option>
-            <option value="tainan" data-center="22.9999,120.2269" id="region.tainan">Tainan</option>
-            <option value="kaohsiung" data-center="22.6273,120.3014" id="region.kaohsiung">Kaohsiung</option>
-            <option value="gta" data-center="35.6762,139.6503" id="region.gta">Greater Tokyo</option>
           </select>
           <label for="scenario"><span id="filters.scenario">Scenario</span>：</label>
           <select id="scenario">
-            <option value="day-clear" id="scenario.day-clear">Day / Clear</option>
+            <option value="day-clear"  id="scenario.day-clear">Day / Clear</option>
             <option value="night-clear" id="scenario.night-clear">Night / Clear</option>
-            <option value="day-rain" id="scenario.day-rain">Day / Rain</option>
-            <option value="night-rain" id="scenario.night-rain">Night / Rain</option>
+            <option value="day-rain"    id="scenario.day-rain">Day / Rain</option>
+            <option value="night-rain"  id="scenario.night-rain">Night / Rain</option>
+          </select>
+          <label for="filter"><span id="filters.threshold">Filter</span>：</label>
+          <select id="filter">
+            <option value="all">All</option>
+            <option value="p70">≥ P70</option>
+            <option value="p80" selected>≥ P80</option>
+            <option value="p90">≥ P90</option>
           </select>
         </div>
       </div>
-      <div class="row" style="margin-top:8px">
-        <small id="map.legend.low">Low</small>
+      <div class="row">
+        <small id="map.legend.low">低</small>
         <div style="flex:1;height:8px;background:linear-gradient(90deg,#60a5fa,#f59e0b,#ef4444);border-radius:999px"></div>
-        <small id="map.legend.high">High</small>
+        <small id="map.legend.high">高</small>
       </div>
     </div>
 
-    <div class="card" style="margin-top:16px">
+    <div class="card">
       <div class="row" style="margin:0 0 8px 0">
-        <b id="section.map">Map</b>
-        <small id="map.subtitle" style="margin-left:8px">UGPS score points</small>
-        <div style="margin-left:auto">
-          <button id="btn-points" class="badge active"><span id="map.toggle.points">Points</span></button>
-          <button id="btn-heat" class="badge"><span id="map.toggle.heat">Heatmap</span></button>
+        <b id="section.map">地圖</b>
+        <small id="map.subtitle" style="margin-left:8px">UGPS 分數點位</small>
+        <div class="toolbar">
+          <button id="btn-points" class="badge active"><span id="map.toggle.points">點位</span></button>
+          <button id="btn-heat"   class="badge"><span id="map.toggle.heat">熱度圖</span></button>
         </div>
       </div>
       <div id="map"></div>
     </div>
 
-    <div class="card" id="top.card" style="margin-top:16px">
+    <div class="card" id="top.card">
       <div class="row" style="margin:0 0 8px 0">
-        <b id="top.title">Top-3</b>
-        <button id="top.exportTask" class="badge" style="margin-left:auto">Export tasks</button>
-        <button id="top.export" class="badge">Export</button>
+        <b id="top.title">優先格網 Top-3</b>
+        <button id="top.exportTask" class="badge" style="margin-left:auto">匯出外展任務（CSV）</button>
+        <button id="top.export" class="badge">匯出（CSV）</button>
       </div>
       <div id="top.list"><small>Loading…</small></div>
     </div>
@@ -108,82 +114,120 @@
       document.getElementById("btn-zhtw").onclick = () => loadLang("zhtw");
       document.getElementById("btn-enus").onclick = () => loadLang("enus");
 
-      // Leaflet helpers
-      let map, markersLayer, heatLayer=null, __heatSolo=[], __heatOverlay=[], __dataset=[];
-      window.__ugpsTop3 = []; window.__ugpsContext = {};
-
-      function radiusForZoom(z){ if(z<=9)return 18; if(z<=12)return 18+(z-9)*8; if(z<=15)return 42+(z-12)*6; if(z<=18)return 60+(z-15)*6; return 80; }
-      function makeHeatLayer(dataset){
-        const z=map.getZoom(); const r=Math.round(radiusForZoom(z)); const blur=Math.round(r*0.6);
-        return L.heatLayer(dataset, {radius:r, blur, maxZoom:19, minOpacity:0.58, gradient: {0:"#60a5fa",0.35:"#93c5fd",0.55:"#f59e0b",0.75:"#f97316",1:"#ef4444"}});
-      }
-      function colorByScore01(x){ const clrs=[[220,91,60],[38,90,55],[0,85,58]]; const p=Math.max(0,Math.min(1,x)); const t=p<0.5?p*2:(p-0.5)*2; const a=p<0.5?clrs[0]:clrs[1]; const b=p<0.5?clrs[1]:clrs[2]; const h=a[0]+(b[0]-a[0])*t; const s=a[1]+(b[1]-a[1])*t; const l=a[2]+(b[2]-a[2])*t; return `hsl(${h}deg ${s}% ${l}%)`; }
+      /* ---------- Map helpers ---------- */
+      let map, markersLayer, heatLayer=null, ptsAll=[], ptsFiltered=[], __heatSolo=[];
+      window.__ugpsTop3=[]; window.__ugpsContext={};
 
       function ensureMap(){
         if(map) return;
         map = L.map("map");
         L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {maxZoom:19, attribution:'&copy; OpenStreetMap contributors'}).addTo(map);
-        map.createPane("points"); map.getPane("points").style.zIndex = 650; markersLayer = L.layerGroup().addTo(map); map.setView([25.0478,121.5170], 13);
-        map.on("zoomend", ()=>{ if(!heatLayer) return; map.removeLayer(heatLayer); heatLayer = makeHeatLayer(__heatSolo).addTo(map); });
+        map.createPane("points"); map.getPane("points").style.zIndex = 650;
+        markersLayer = L.layerGroup().addTo(map);
+        map.setView([25.0478,121.5170], 13);
+        map.on("zoomend", ()=>{ if(document.getElementById("btn-heat").classList.contains("active")) rebuildHeat(); else drawPoints(); });
       }
+
+      function radiusForZoom(z){
+        if(z<=11) return {core:4, halo:6, edge:1};
+        if(z<=13) return {core:5, halo:8, edge:1.2};
+        if(z<=15) return {core:7, halo:10, edge:1.4};
+        return {core:8, halo:12, edge:1.6};
+      }
+      function colorByScore01(x){ const clrs=[[220,91,60],[38,90,55],[0,85,58]]; const p=Math.max(0,Math.min(1,x)); const t=p<0.5?p*2:(p-0.5)*2; const a=p<0.5?clrs[0]:clrs[1]; const b=p<0.5?clrs[1]:clrs[2]; const h=a[0]+(b[0]-a[0])*t; const s=a[1]+(b[1]-a[1])*t; const l=a[2]+(b[2]-a[2])*t; return `hsl(${h}deg ${s}% ${l}%)`; }
+
+      function applyFilter(all){
+        const mode = document.getElementById("filter").value;
+        if(mode==="all") return all;
+        const values = all.map(p=>p.score).sort((a,b)=>a-b);
+        const q = (t)=> values[Math.floor((values.length-1)*t)];
+        let thr = 0;
+        if(mode==="p70") thr = q(0.70);
+        if(mode==="p80") thr = q(0.80);
+        if(mode==="p90") thr = q(0.90);
+        return all.filter(p=>p.score>=thr);
+      }
+
+      function drawPoints(){
+        const z = map.getZoom();
+        const s = radiusForZoom(z);
+        markersLayer.clearLayers();
+        const bounds=[];
+        ptsFiltered.forEach(p=>{
+          const ll=[p.lat,p.lon];
+          bounds.push(ll);
+          L.circleMarker(ll,{pane:"points",radius:s.halo,color:"#ffffff",weight:5,fill:false,opacity:0.85}).addTo(markersLayer);
+          L.circleMarker(ll,{pane:"points",radius:s.core,color:"#111",weight:s.edge,fillColor:colorByScore01(p.score),fillOpacity:0.95})
+            .bindPopup(`<b>${p.id}</b><br/>${p.lat.toFixed(5)}, ${p.lon.toFixed(5)}<br/>Score: ${(p.score*100).toFixed(0)}`).addTo(markersLayer);
+        });
+        if(bounds.length) map.fitBounds(bounds,{padding:[24,24]});
+      }
+
+      function rebuildHeat(){
+        if(heatLayer && map.hasLayer(heatLayer)) map.removeLayer(heatLayer);
+        // normalize by P10-P90
+        const scores = ptsAll.map(p=>p.score).sort((a,b)=>a-b);
+        const q=t=> scores.length? scores[Math.floor((scores.length-1)*t)] : 0;
+        const p10=q(0.10), p90=q(0.90), rng=Math.max(1e-6,p90-p10);
+        __heatSolo = ptsAll.map(p=>{ let s=(p.score-p10)/rng; s=Math.max(0,Math.min(1,s)); const gamma=0.55; let w=Math.pow(s,gamma); return [p.lat,p.lon,0.12+0.88*w]; });
+        const z = map.getZoom();
+        const heat = L.heatLayer(__heatSolo, {radius: Math.round( (z<=9?18:(z<=12?18+(z-9)*8:(z<=15?42+(z-12)*6:60+(z-15)*6)) ), blur: 30, maxZoom: 19, minOpacity:0.58,
+          gradient:{0:"#60a5fa",0.35:"#93c5fd",0.55:"#f59e0b",0.75:"#f97316",1:"#ef4444"}
+        });
+        heatLayer = heat.addTo(map);
+      }
+
       function showPoints(){ document.getElementById("btn-points").classList.add("active"); document.getElementById("btn-heat").classList.remove("active"); if(markersLayer && !map.hasLayer(markersLayer)) markersLayer.addTo(map); if(heatLayer && map.hasLayer(heatLayer)) map.removeLayer(heatLayer); }
-      function showHeat(){ document.getElementById("btn-heat").classList.add("active"); document.getElementById("btn-points").classList.remove("active"); if(markersLayer && map.hasLayer(markersLayer)) map.removeLayer(markersLayer); if(heatLayer && map.hasLayer(heatLayer)) map.removeLayer(heatLayer); heatLayer = makeHeatLayer(__heatSolo).addTo(map); }
-      document.getElementById("btn-points").onclick = showPoints; document.getElementById("btn-heat").onclick = showHeat;
+      function showHeat(){ document.getElementById("btn-heat").classList.add("active"); document.getElementById("btn-points").classList.remove("active"); if(markersLayer && map.hasLayer(markersLayer)) map.removeLayer(markersLayer); rebuildHeat(); }
+      document.getElementById("btn-points").onclick = showPoints;
+      document.getElementById("btn-heat").onclick   = showHeat;
+      document.getElementById("filter").onchange = ()=>{ ptsFiltered = applyFilter(ptsAll); drawPoints(); };
 
       async function loadData(region, scenario){
         ensureMap();
-        const path = `./data/${region}/${scenario}.json`;
-        let data = null;
+        let data=null;
         try{
-          const res = await fetch(path, { cache: "no-cache" });
-          if(!res.ok) throw new Error("fetch failed");
+          const res = await fetch(`./data/${region}/${scenario}.json`, {cache:"no-cache"});
+          if(!res.ok) throw new Error("no region file");
           data = await res.json();
-        }catch(e){
-          const fallback = "./data/ugps.json";
-          const r2 = await fetch(fallback); data = await r2.json();
+        }catch(_){
+          const res2 = await fetch("./data/ugps.json", {cache:"no-cache"});
+          data = await res2.json();
         }
         window.__ugpsContext = data.context || {};
         const pts = Array.isArray(data.grid) ? data.grid : [];
-        __dataset = pts;
-        const top = [...pts].sort((a,b)=>b.score-a.score).slice(0,3);
-        window.__ugpsTop3 = top;
-        const toRow = (c,i)=>`<div class="list-row"><span>${i+1}. ${c.id} (${c.lat.toFixed(4)}, ${c.lon.toFixed(4)})</span><b>${(c.score*100).toFixed(0)}</b></div>`;
-        document.getElementById("top.list").innerHTML = top.length ? top.map(toRow).join("") : `<small id="map.nodata">No data</small>`;
+        ptsAll = pts.slice(0);
+        ptsFiltered = applyFilter(ptsAll);
 
-        markersLayer.clearLayers();
-        const bounds = [];
-        const coreR=8, haloR=coreR+3;
-        pts.forEach(p=>{ const ll=[p.lat,p.lon]; bounds.push(ll);
-          L.circleMarker(ll, {pane:"points", radius:haloR, color:"#fff", weight:5, fill:false, opacity:0.9}).addTo(markersLayer);
-          L.circleMarker(ll, {pane:"points", radius:coreR, color:"#111", weight:1.6, fillColor:colorByScore01(p.score), fillOpacity:0.95})
-            .bindPopup(`<b>${p.id}</b><br/>${p.lat.toFixed(5)}, ${p.lon.toFixed(5)}<br/>Score: ${(p.score*100).toFixed(0)}`).addTo(markersLayer);
-        });
-        if(bounds.length) map.fitBounds(bounds, {padding:[20,20]});
-        // heat weights
-        const sorted = pts.map(p=>p.score).sort((a,b)=>a-b);
-        const q=t=>sorted.length?sorted[Math.floor((sorted.length-1)*t)]:0;
-        const p10=q(0.10), p90=q(0.90), rng=Math.max(1e-6, p90-p10);
-        __heatSolo = pts.map(p=>{ let s=(p.score-p10)/rng; s=Math.max(0,Math.min(1,s)); const gamma=0.55; let w=Math.pow(s,gamma); return [p.lat,p.lon,0.12+0.88*w]; });
+        // top-3
+        const top = [...ptsAll].sort((a,b)=>b.score-a.score).slice(0,3);
+        window.__ugpsTop3 = top;
+        const rows = top.map((c,i)=>`<div class="list-row"><span>${i+1}. ${c.id} (${c.lat.toFixed(4)}, ${c.lon.toFixed(4)})</span><b>${(c.score*100).toFixed(0)}</b></div>`).join("");
+        document.getElementById("top.list").innerHTML = rows || `<small>目前無資料</small>`;
+
+        // draw default
         showPoints();
+        drawPoints();
       }
 
       function currentSel(){ return { region: document.getElementById("region").value, scenario: document.getElementById("scenario").value }; }
-      document.getElementById("region").onchange = ()=>{ const {region,scenario} = currentSel(); loadData(region, scenario); };
-      document.getElementById("scenario").onchange = ()=>{ const {region,scenario} = currentSel(); loadData(region, scenario); };
+      document.getElementById("region").onchange   = ()=>{ const {region,scenario}=currentSel(); loadData(region,scenario); };
+      document.getElementById("scenario").onchange = ()=>{ const {region,scenario}=currentSel(); loadData(region,scenario); };
 
-      function toCSV(rows){ const header=["rank","id","lat","lon","score_0to100"]; const lines=[header.join(",")].concat(rows.map((c,i)=>[i+1,c.id,c.lat,c.lon,Math.round(c.score*100)].join(","))); return lines.join("\r\n"); }
-      function downloadCSV(filename,text){ const BOM="\uFEFF"; const blob=new Blob([BOM+text],{type:"text/csv;charset=utf-8;"}); const url=URL.createObjectURL(blob); const a=document.createElement("a"); a.href=url; a.download=filename; document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url); }
-      function toTaskCSV(rows, context){ const header=["datetime_window","cell_id","lat","lon","score_0to100","scenario","note"]; const dt=new Date().toISOString().slice(0,16).replace("T"," "); const scen=(context&&context.scenario)||"unknown"; const lines=[header.join(",")].concat(rows.map((c,i)=>[`${dt} ~ +2h`,c.id,c.lat,c.lon,Math.round(c.score*100),scen,`Rank ${i+1}`].join(","))); return lines.join("\r\n"); }
-      document.getElementById("top.export").onclick = ()=>{ const rows=window.__ugpsTop3||[]; if(!rows.length)return alert("No data"); const {region,scenario}=currentSel(); downloadCSV(`ugps-top3-${region}-${scenario}-${(new Date()).toISOString().slice(0,10)}.csv`, toCSV(rows)); };
+      // CSV helpers
+      function toCSV(rows){ const header=["rank","id","lat","lon","score_0to100"]; const lines=[header.join(",")].concat(rows.map((c,i)=>[i+1,c.id,c.lat,c.lon,Math.round(c.score*100)].join(","))); return lines.join("\\r\\n"); }
+      function toTaskCSV(rows, context){ const header=["datetime_window","cell_id","lat","lon","score_0to100","scenario","note"]; const dt=new Date().toISOString().slice(0,16).replace("T"," "); const scen=(context&&context.scenario)||"unknown"; const lines=[header.join(",")].concat(rows.map((c,i)=>[`${dt} ~ +2h`,c.id,c.lat,c.lon,Math.round(c.score*100),scen,`Rank ${i+1}`].join(","))); return lines.join("\\r\\n"); }
+      function downloadCSV(filename,text){ const BOM="\\uFEFF"; const blob=new Blob([BOM+text],{type:"text/csv;charset=utf-8;"}); const url=URL.createObjectURL(blob); const a=document.createElement("a"); a.href=url; a.download=filename; document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url); }
+      document.getElementById("top.export").onclick      = ()=>{ const rows=window.__ugpsTop3||[]; if(!rows.length)return alert("No data"); const {region,scenario}=currentSel(); downloadCSV(`ugps-top3-${region}-${scenario}-${(new Date()).toISOString().slice(0,10)}.csv`, toCSV(rows)); };
       document.getElementById("top.exportTask").onclick = ()=>{ const rows=window.__ugpsTop3||[]; if(!rows.length)return alert("No data"); const {region,scenario}=currentSel(); downloadCSV(`ugps-outreach-${region}-${scenario}-${(new Date()).toISOString().slice(0,10)}.csv`, toTaskCSV(rows, window.__ugpsContext||{})); };
 
       // init
       loadLang(lang);
-      const initRegion = "taipei", initScenario = "day-clear"; loadData(initRegion, initScenario);
+      loadData("taipei","day-clear");
     </script>
 
     <div style="position:fixed;right:16px;bottom:16px;background:#fff;border:1px solid #eee;border-radius:10px;padding:8px 12px;font-size:12px;color:#555">
-      <b id="meta.dataSource">資料來源</b>：OSM / Gov Open Data　|　<b id="meta.version">版本</b>：v0.0.2
+      <b id="meta.dataSource">資料來源</b>：OSM / Gov Open Data　|　<b id="meta.version">版本</b>：v0.0.3
     </div>
   </body>
 </html>
