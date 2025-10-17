@@ -5,9 +5,9 @@
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title>UGPS</title>
 
-    <!-- Leaflet core -->
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+    <!-- Leaflet core (primary CDN) -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="anonymous" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin="anonymous"></script>
     <!-- Heatmap plugin -->
     <script src="https://unpkg.com/leaflet.heat/dist/leaflet-heat.js"></script>
 
@@ -24,6 +24,7 @@
       #map { width:100%; height:520px; border-radius:12px; }
       .list-row { display:flex; justify-content:space-between; padding:6px 8px; border:1px solid var(--border); border-radius:8px; margin-top:6px }
       .toolbar { margin-left:auto; display:flex; gap:12px; align-items:center; }
+      .alert { color:#b91c1c; background:#fee2e2; border:1px solid #fecaca; padding:8px 10px; border-radius:8px; }
     </style>
   </head>
   <body>
@@ -82,6 +83,7 @@
         </div>
       </div>
       <div id="map"></div>
+      <div id="map.msg" style="margin-top:8px"></div>
     </div>
 
     <div class="card" id="top.card">
@@ -114,17 +116,36 @@
       document.getElementById("btn-zhtw").onclick = () => loadLang("zhtw");
       document.getElementById("btn-enus").onclick = () => loadLang("enus");
 
+      /* ---------- Boot: ensure Leaflet is ready even if primary CDN fails ---------- */
+      async function ensureLeaflet(){
+        if (window.L) return;
+        // fallback CSS
+        const link = document.createElement("link");
+        link.rel = "stylesheet";
+        link.href = "https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css";
+        document.head.appendChild(link);
+        // fallback JS
+        await new Promise((resolve, reject)=>{
+          const s = document.createElement("script");
+          s.src = "https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js";
+          s.onload = resolve;
+          s.onerror = ()=> reject(new Error("Leaflet 載入失敗（CDN 皆不可用）"));
+          document.head.appendChild(s);
+        });
+      }
+
       /* ---------- Map helpers ---------- */
       let map, markersLayer, heatLayer=null, ptsAll=[], ptsFiltered=[], __heatSolo=[];
       window.__ugpsTop3=[]; window.__ugpsContext={};
 
       function ensureMap(){
         if(map) return;
-        map = L.map("map");
+        map = L.map("map", { preferCanvas:true });
         L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {maxZoom:19, attribution:'&copy; OpenStreetMap contributors'}).addTo(map);
         map.createPane("points"); map.getPane("points").style.zIndex = 650;
         markersLayer = L.layerGroup().addTo(map);
         map.setView([25.0478,121.5170], 13);
+        setTimeout(()=> map.invalidateSize(), 50);
         map.on("zoomend", ()=>{ if(document.getElementById("btn-heat").classList.contains("active")) rebuildHeat(); else drawPoints(); });
       }
 
@@ -184,15 +205,24 @@
       document.getElementById("filter").onchange = ()=>{ ptsFiltered = applyFilter(ptsAll); drawPoints(); };
 
       async function loadData(region, scenario){
+        const msg = (t)=>{ const el=document.getElementById("map.msg"); el.innerHTML = t? `<div class="alert">${t}</div>` : ""; }
+        msg("");
         ensureMap();
         let data=null;
         try{
-          const res = await fetch(`./data/${region}/${scenario}.json`, {cache:"no-cache"});
-          if(!res.ok) throw new Error("no region file");
-          data = await res.json();
-        }catch(_){
-          const res2 = await fetch("./data/ugps.json", {cache:"no-cache"});
-          data = await res2.json();
+          const r1 = await fetch(`./data/${region}/${scenario}.json`, {cache:"no-cache"});
+          if(!r1.ok) throw new Error("region file not found");
+          data = await r1.json();
+        }catch(e1){
+          console.warn("region data missing, fallback to ugps.json", e1);
+          try{
+            const r2 = await fetch("./data/ugps.json", {cache:"no-cache"});
+            if(!r2.ok) throw new Error("ugps.json not found");
+            data = await r2.json();
+          }catch(e2){
+            msg("讀取資料失敗：找不到 data/… 檔案。");
+            throw e2;
+          }
         }
         window.__ugpsContext = data.context || {};
         const pts = Array.isArray(data.grid) ? data.grid : [];
@@ -211,8 +241,8 @@
       }
 
       function currentSel(){ return { region: document.getElementById("region").value, scenario: document.getElementById("scenario").value }; }
-      document.getElementById("region").onchange   = ()=>{ const {region,scenario}=currentSel(); loadData(region,scenario); };
-      document.getElementById("scenario").onchange = ()=>{ const {region,scenario}=currentSel(); loadData(region,scenario); };
+      document.getElementById("region").onchange   = ()=>{ const {region,scenario}=currentSel(); loadData(region,scenario).catch(e=>console.error(e)); };
+      document.getElementById("scenario").onchange = ()=>{ const {region,scenario}=currentSel(); loadData(region,scenario).catch(e=>console.error(e)); };
 
       // CSV helpers
       function toCSV(rows){ const header=["rank","id","lat","lon","score_0to100"]; const lines=[header.join(",")].concat(rows.map((c,i)=>[i+1,c.id,c.lat,c.lon,Math.round(c.score*100)].join(","))); return lines.join("\\r\\n"); }
@@ -221,13 +251,23 @@
       document.getElementById("top.export").onclick      = ()=>{ const rows=window.__ugpsTop3||[]; if(!rows.length)return alert("No data"); const {region,scenario}=currentSel(); downloadCSV(`ugps-top3-${region}-${scenario}-${(new Date()).toISOString().slice(0,10)}.csv`, toCSV(rows)); };
       document.getElementById("top.exportTask").onclick = ()=>{ const rows=window.__ugpsTop3||[]; if(!rows.length)return alert("No data"); const {region,scenario}=currentSel(); downloadCSV(`ugps-outreach-${region}-${scenario}-${(new Date()).toISOString().slice(0,10)}.csv`, toTaskCSV(rows, window.__ugpsContext||{})); };
 
-      // init
-      loadLang(lang);
-      loadData("taipei","day-clear");
+      // Boot sequence: ensure Leaflet even if primary CDN fails; then load UI/data.
+      (async function boot(){
+        try{
+          await loadLang(lang);
+          await ensureLeaflet();
+          ensureMap();
+          await loadData("taipei","day-clear");
+        }catch(e){
+          console.error(e);
+          const el=document.getElementById("map.msg");
+          el.innerHTML = `<div class="alert">初始化失敗：${e.message}</div>`;
+        }
+      })();
     </script>
 
     <div style="position:fixed;right:16px;bottom:16px;background:#fff;border:1px solid #eee;border-radius:10px;padding:8px 12px;font-size:12px;color:#555">
-      <b id="meta.dataSource">資料來源</b>：OSM / Gov Open Data　|　<b id="meta.version">版本</b>：v0.0.3
+      <b id="meta.dataSource">資料來源</b>：OSM / Gov Open Data　|　<b id="meta.version">版本</b>：v0.0.3-fix
     </div>
   </body>
 </html>
