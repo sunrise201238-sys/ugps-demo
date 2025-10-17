@@ -23,7 +23,7 @@ jobs:
 
       - name: Fetch raw data (OSM)
         run: |
-          python tools/fetch_raw.py --regions data/regions.json
+              python tools/fetch_raw.py --regions data/regions.json --scenarios day-clear --step_m 800 --radius_m 250
 
       - name: Compute UGPS (all regions & scenarios)
         run: |
